@@ -25,8 +25,8 @@ class AddRepoDialog(Gtk.Window):
             transient_for=parent,
             modal=True,
             title="Add shader repository",
-            default_width=440,
-            default_height=360,
+            default_width=480,
+            default_height=400,
         )
         self._paths = paths
         self._on_saved = on_saved
@@ -45,12 +45,22 @@ class AddRepoDialog(Gtk.Window):
             grid.attach(widget, 1, r, 1, 1)
 
         self._id_entry = Gtk.Entry()
-        self._id_entry.set_placeholder_text("e.g. my-shaders (lowercase id)")
-        row(0, "ID", self._id_entry)
+        self._id_entry.set_placeholder_text("e.g. my-pack")
+        self._id_entry.set_tooltip_text(
+            "This short name is used everywhere on disk: your game gets folders "
+            "reshade-shaders/Shaders/THIS and …/Textures/THIS, and the Git clone lives under "
+            "RSM data in repos/THIS. Use lowercase letters, digits, dashes, and underscores only. "
+            "Must differ from built-in repo IDs (e.g. quint, reshade-shaders)."
+        )
+        row(0, "Folder name (ID)", self._id_entry)
 
         self._name_entry = Gtk.Entry()
-        self._name_entry.set_placeholder_text("Display name")
-        row(1, "Name", self._name_entry)
+        self._name_entry.set_placeholder_text("e.g. My shader pack")
+        self._name_entry.set_tooltip_text(
+            "Human-readable title shown in the Manage shaders list only. "
+            "If you leave it empty, the folder name is used."
+        )
+        row(1, "Display name", self._name_entry)
 
         self._url_entry = Gtk.Entry()
         self._url_entry.set_hexpand(True)
@@ -68,8 +78,11 @@ class AddRepoDialog(Gtk.Window):
         outer.append(grid)
 
         hint = Gtk.Label(
-            label="ID must be unique among built-in and user repos. "
-            "If the same ID exists in the PCGW cache, your entry overrides it in the catalog.",
+            label=(
+                "Folder name (ID) must be unique among your saved repos and must not match a "
+                "built-in ID. If a PCGamingWiki entry uses the same ID, your custom repo replaces "
+                "that catalog entry when lists are merged."
+            ),
             xalign=0.0,
             wrap=True,
         )
@@ -96,7 +109,7 @@ class AddRepoDialog(Gtk.Window):
         author = self._author_entry.get_text().strip()
         desc = self._desc_entry.get_text().strip()
         if not rid:
-            self._show_error("Repository ID is required.")
+            self._show_error("Folder name (ID) is required.")
             return
         if not name:
             name = rid
