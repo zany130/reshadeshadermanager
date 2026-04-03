@@ -65,6 +65,30 @@ def fake_git_repo(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("reshade_shader_manager.core.link_farm.clone_or_pull", _fake)
 
 
+@pytest.fixture
+def fake_git_repo_nested(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Clone root has no Shaders/; nested folder holds .fx directly."""
+
+    def _fake(repo_dir: Path, git_url: str, **kwargs: object) -> None:
+        repo_dir.mkdir(parents=True, exist_ok=True)
+        nested = repo_dir / "pack" / "glsl"
+        nested.mkdir(parents=True)
+        (nested / "effect.fx").write_text("//nested", encoding="utf-8")
+
+    monkeypatch.setattr("reshade_shader_manager.core.link_farm.clone_or_pull", _fake)
+
+
+@pytest.fixture
+def fake_git_repo_flat_fx(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Only loose .fx at clone root (file fallback)."""
+
+    def _fake(repo_dir: Path, git_url: str, **kwargs: object) -> None:
+        repo_dir.mkdir(parents=True, exist_ok=True)
+        (repo_dir / "root.fx").write_text("//root", encoding="utf-8")
+
+    monkeypatch.setattr("reshade_shader_manager.core.link_farm.clone_or_pull", _fake)
+
+
 def test_install_remove_reshade_flow(
     tmp_path: Path, rsm_paths: RsmPaths, fake_download: None
 ) -> None:
@@ -167,6 +191,41 @@ def test_apply_rebuild_recreates_symlinks_after_manual_delete(
     assert m2 is not None
     assert "testrepo" in m2.enabled_repo_ids
     assert (game / "reshade-shaders" / "Shaders" / "testrepo" / "test.fx").is_file()
+
+
+def test_enable_nested_shader_directory(tmp_path: Path, rsm_paths: RsmPaths, fake_git_repo_nested: None) -> None:
+    game = tmp_path / "game_nested"
+    game.mkdir(parents=True)
+    m = new_game_manifest(game)
+    ok = enable_shader_repo(
+        paths=rsm_paths,
+        manifest=m,
+        repo_id="nested",
+        git_url="https://example.com/nested.git",
+        git_pull=True,
+    )
+    assert ok is True
+    assert (game / "reshade-shaders" / "Shaders" / "nested" / "effect.fx").is_file()
+    m2 = load_game_manifest(rsm_paths, game)
+    assert m2 is not None
+    assert "nested" in m2.enabled_repo_ids
+
+
+def test_enable_flat_fx_file_fallback(tmp_path: Path, rsm_paths: RsmPaths, fake_git_repo_flat_fx: None) -> None:
+    game = tmp_path / "game_flat"
+    game.mkdir(parents=True)
+    m = new_game_manifest(game)
+    ok = enable_shader_repo(
+        paths=rsm_paths,
+        manifest=m,
+        repo_id="flatty",
+        git_url="https://example.com/flat.git",
+        git_pull=True,
+    )
+    assert ok is True
+    p = game / "reshade-shaders" / "Shaders" / "flatty" / "root.fx"
+    assert p.is_symlink()
+    assert p.read_text(encoding="utf-8") == "//root"
 
 
 def test_unlink_recorded_skips_non_symlink(tmp_path: Path) -> None:
