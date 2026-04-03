@@ -21,7 +21,7 @@ from reshade_shader_manager.core.git_sync import pull_existing_clones_for_catalo
 from reshade_shader_manager.core.pcgw import get_pcgw_repos
 from reshade_shader_manager.core.repos import merged_catalog
 from reshade_shader_manager.core.reshade import check_reshade, install_reshade, remove_reshade_binaries
-from reshade_shader_manager.core.targets import DX8_NOT_IMPLEMENTED_MSG, detect_game_arch
+from reshade_shader_manager.core.targets import detect_game_arch
 from reshade_shader_manager.core.ui_state import WindowUiState, load_window_ui_state, save_window_ui_state
 from reshade_shader_manager.ui.add_repo_dialog import AddRepoDialog
 from reshade_shader_manager.ui.error_format import format_exception_for_ui
@@ -32,7 +32,7 @@ log = logging.getLogger(__name__)
 
 API_ROWS: list[tuple[str, str]] = [
     ("opengl", "OpenGL"),
-    ("dx8", "DirectX 8 (not implemented in v0.1)"),
+    ("dx8", "DirectX 8 (d3d8to9 + ReShade as D3D9; 32-bit only)"),
     ("dx9", "DirectX 9"),
     ("dx10", "DirectX 10"),
     ("dx11", "DirectX 11"),
@@ -395,10 +395,6 @@ class MainWindow(Gtk.ApplicationWindow):
                 "or place an .exe in the game folder."
             )
             return
-        api = self._api_combo.get_active_id()
-        if api == "dx8":
-            self._show_error(DX8_NOT_IMPLEMENTED_MSG)
-            return
         ver = self._version_entry.get_text().strip() or self._config.default_reshade_version
         m = self._sync_manifest_from_ui()
 
@@ -435,10 +431,6 @@ class MainWindow(Gtk.ApplicationWindow):
                 "Could not detect 32/64-bit architecture. Add a Windows .exe (optional chooser) "
                 "or place an .exe in the game folder."
             )
-            return
-        api = self._api_combo.get_active_id()
-        if api == "dx8":
-            self._show_error(DX8_NOT_IMPLEMENTED_MSG)
             return
         m = self._sync_manifest_from_ui()
 
