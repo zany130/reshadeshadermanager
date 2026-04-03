@@ -40,6 +40,7 @@ class RsmPaths:
             self.data_dir / "repos",
             self.data_dir / "reshade" / "downloads",
             self.data_dir / "reshade" / "extracted",
+            self.data_dir / "d3d8to9",
             self.data_dir / "logs",
             self.cache_dir,
         ):
@@ -76,6 +77,11 @@ class RsmPaths:
 
     def reshade_latest_cache_path(self) -> Path:
         return self.cache_dir / "reshade_latest_cache.json"
+
+    def d3d8to9_cached_dll_path(self, *, release_tag: str) -> Path:
+        """Cached copy of upstream d3d8to9 ``d3d8.dll`` (``release_tag`` e.g. ``v1.15.1``)."""
+        safe = release_tag.lstrip("v").replace("/", "-")
+        return self.data_dir / "d3d8to9" / f"d3d8-{safe}.dll"
 
 
 def game_id_from_game_dir(game_dir: str | Path) -> str:
