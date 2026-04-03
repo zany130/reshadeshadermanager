@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 # Wine/ReShade expect Windows-style paths here (per PROJECT_SPEC.md)
-DEFAULT_EFFECT_SEARCH = r".\reshade-shaders\Shaders**"
-DEFAULT_TEXTURE_SEARCH = r".\reshade-shaders\Textures**"
+DEFAULT_EFFECT_SEARCH = r".\reshade-shaders\Shaders\**"
+DEFAULT_TEXTURE_SEARCH = r".\reshade-shaders\Textures\**"
 
 
 def _split_key_value(line: str) -> tuple[str, str] | None:

@@ -6,8 +6,8 @@ from reshade_shader_manager.core.ini import patch_reshade_search_paths
 def test_patch_minimal() -> None:
     out = patch_reshade_search_paths(None)
     assert "[GENERAL]" in out
-    assert r"EffectSearchPaths=.\reshade-shaders\Shaders**" in out
-    assert r"TextureSearchPaths=.\reshade-shaders\Textures**" in out
+    assert r"EffectSearchPaths=.\reshade-shaders\Shaders\**" in out
+    assert r"TextureSearchPaths=.\reshade-shaders\Textures\**" in out
 
 
 def test_patch_replace_in_general() -> None:
