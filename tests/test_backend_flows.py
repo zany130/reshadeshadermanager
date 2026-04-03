@@ -211,6 +211,41 @@ def test_enable_nested_shader_directory(tmp_path: Path, rsm_paths: RsmPaths, fak
     assert "nested" in m2.enabled_repo_ids
 
 
+@pytest.fixture
+def fake_git_repo_multi_nested_textures(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two texture subdirs (multi-root) — parent Shaders|Textures/<id>/ must be created."""
+
+    def _fake(repo_dir: Path, git_url: str, **kwargs: object) -> None:
+        repo_dir.mkdir(parents=True, exist_ok=True)
+        for name in ("res", "misc"):
+            d = repo_dir / name
+            d.mkdir()
+            (d / "t.png").write_bytes(b"\x89PNG\r\n")
+
+    monkeypatch.setattr("reshade_shader_manager.core.link_farm.clone_or_pull", _fake)
+
+
+def test_enable_multi_nested_texture_roots_creates_parent_dirs(
+    tmp_path: Path, rsm_paths: RsmPaths, fake_git_repo_multi_nested_textures: None
+) -> None:
+    game = tmp_path / "game_multi_tx"
+    game.mkdir(parents=True)
+    m = new_game_manifest(game)
+    ok = enable_shader_repo(
+        paths=rsm_paths,
+        manifest=m,
+        repo_id="reshade",
+        git_url="https://example.com/r.git",
+        git_pull=True,
+    )
+    assert ok is True
+    res_link = game / "reshade-shaders" / "Textures" / "reshade" / "res"
+    misc_link = game / "reshade-shaders" / "Textures" / "reshade" / "misc"
+    assert res_link.is_symlink()
+    assert misc_link.is_symlink()
+    assert (res_link / "t.png").is_file()
+
+
 def test_enable_flat_fx_file_fallback(tmp_path: Path, rsm_paths: RsmPaths, fake_git_repo_flat_fx: None) -> None:
     game = tmp_path / "game_flat"
     game.mkdir(parents=True)

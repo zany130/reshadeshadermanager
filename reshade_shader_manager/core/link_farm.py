@@ -210,6 +210,8 @@ def _symlink_dir_or_skip(link: Path, target: Path, *, repo_id: str) -> bool:
         return False
     if link.is_symlink() or link.exists():
         link.unlink(missing_ok=True)
+    # Nested multi-root layout uses e.g. Shaders/<repo>/<subdir>; parents must exist.
+    link.parent.mkdir(parents=True, exist_ok=True)
     link.symlink_to(target.resolve(), target_is_directory=True)
     log.debug("Symlink %s -> %s", link, target)
     return True
