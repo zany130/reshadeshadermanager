@@ -9,7 +9,10 @@ from typing import Any, Mapping
 
 from reshade_shader_manager.core.paths import RsmPaths, game_id_from_game_dir
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+# v0.2+: plugin add-ons (DLLs / optional companion shaders) — not ReShade's installer "addon" variant
+# (see ``reshade_variant`` / ``VALID_VARIANTS``).
 
 VALID_GRAPHICS_APIS = frozenset({"opengl", "dx8", "dx9", "dx10", "dx11", "dx12"})
 VALID_VARIANTS = frozenset({"standard", "addon"})
@@ -28,6 +31,10 @@ class GameManifest:
     enabled_repo_ids: list[str] = field(default_factory=list)
     installed_reshade_files: list[str] = field(default_factory=list)
     symlinks_by_repo_id: dict[str, list[str]] = field(default_factory=dict)
+    # Plugin add-ons (metadata only in v0.2 milestone 1; install logic comes later).
+    enabled_plugin_addon_ids: list[str] = field(default_factory=list)
+    plugin_addon_root_copies: dict[str, list[str]] = field(default_factory=dict)
+    plugin_addon_companion_symlinks: dict[str, list[str]] = field(default_factory=dict)
 
     def validate(self) -> None:
         if self.schema_version != SCHEMA_VERSION:
@@ -48,6 +55,14 @@ class GameManifest:
             k: list(v) for k, v in sorted(self.symlinks_by_repo_id.items(), key=lambda kv: kv[0])
         }
         d["enabled_repo_ids"] = sorted(set(self.enabled_repo_ids))
+        d["enabled_plugin_addon_ids"] = sorted(set(self.enabled_plugin_addon_ids))
+        d["plugin_addon_root_copies"] = {
+            k: list(v) for k, v in sorted(self.plugin_addon_root_copies.items(), key=lambda kv: kv[0])
+        }
+        d["plugin_addon_companion_symlinks"] = {
+            k: list(v)
+            for k, v in sorted(self.plugin_addon_companion_symlinks.items(), key=lambda kv: kv[0])
+        }
         return d
 
     @staticmethod
@@ -66,9 +81,30 @@ class GameManifest:
             if not isinstance(v, list):
                 raise ValueError(f"symlinks_by_repo_id[{k!r}] must be a list")
             sym_clean[k] = [str(x) for x in v]
+
+        def _str_list_dict(key: str) -> dict[str, list[str]]:
+            raw = m.get(key, {})
+            if not isinstance(raw, dict):
+                raise ValueError(f"{key} must be an object")
+            out: dict[str, list[str]] = {}
+            for k, v in raw.items():
+                if not isinstance(k, str):
+                    raise ValueError(f"{key} keys must be strings")
+                if not isinstance(v, list):
+                    raise ValueError(f"{key}[{k!r}] must be a list")
+                out[k] = [str(x) for x in v]
+            return out
+
+        par = _str_list_dict("plugin_addon_root_copies")
+        pac = _str_list_dict("plugin_addon_companion_symlinks")
+
+        file_sv = int(m.get("schema_version", SCHEMA_VERSION))
+        if file_sv > SCHEMA_VERSION:
+            raise ValueError(f"unsupported schema_version {file_sv!r}")
+
         exe = m.get("game_exe")
         return GameManifest(
-            schema_version=int(m.get("schema_version", SCHEMA_VERSION)),
+            schema_version=SCHEMA_VERSION,
             game_dir=str(m.get("game_dir", "")),
             game_exe=None if exe is None else str(exe),
             graphics_api=str(m.get("graphics_api", "dx11")),
@@ -78,6 +114,9 @@ class GameManifest:
             enabled_repo_ids=[str(x) for x in m.get("enabled_repo_ids", [])],
             installed_reshade_files=[str(x) for x in m.get("installed_reshade_files", [])],
             symlinks_by_repo_id=sym_clean,
+            enabled_plugin_addon_ids=[str(x) for x in m.get("enabled_plugin_addon_ids", [])],
+            plugin_addon_root_copies=par,
+            plugin_addon_companion_symlinks=pac,
         )
 
 
