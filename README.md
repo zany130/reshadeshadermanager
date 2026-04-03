@@ -35,8 +35,8 @@ Python:
 ## Setup / Run (from source)
 
 ```bash
-cd /var/home/zany130/Documents/GitHub/reshadeshadermanager
-python -m venv .venv
+cd reshade-shader-manager   # your clone of this repository
+python3 -m venv .venv
 source .venv/bin/activate
 
 # Install backend + UI without asking pip to build PyGObject
@@ -47,6 +47,7 @@ Then run:
 
 ```bash
 reshade-shader-manager
+# or: python3 -m reshade_shader_manager.main
 ```
 
 ## Testing against a real game
@@ -81,7 +82,7 @@ Per-game projection happens under:
 
 ## Packaging
 
-See [packaging/README.md](packaging/README.md) for pip, wheels, Flatpak notes, and distro hints.
+See [packaging/README.md](packaging/README.md) for pip, wheels, optional **AppImage** build steps, Flatpak notes, and distro hints.
 
 ## Roadmap (not v0.1)
 

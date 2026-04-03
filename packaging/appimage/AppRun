@@ -1,0 +1,9 @@
+#!/bin/bash
+set -euo pipefail
+SELF=$(readlink -f "$0")
+HERE="${SELF%/*}"
+export PATH="${HERE}/usr/bin:${PATH}"
+# Prefer system GTK/GObject typelibs and schemas (Fedora-style layout).
+export XDG_DATA_DIRS="${HERE}/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+export GI_TYPELIB_PATH="${GI_TYPELIB_PATH:-}"
+exec "${HERE}/usr/bin/reshade-shader-manager" "$@"

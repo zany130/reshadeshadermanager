@@ -26,6 +26,7 @@ packages = ["reshade_shader_manager"]
 include = [
     "reshade_shader_manager",
     "packaging",
+    "LICENSE",
     "PROJECT_SPEC.md",
     "IMPLEMENTATION_PLAN.md",
     "CONTEXT.md",

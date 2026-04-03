@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=ReShade Shader Manager
+Comment=Manage ReShade and shader repositories for Linux games
+Exec=reshade-shader-manager
+Icon=reshade-shader-manager
+Categories=Utility;
+Terminal=false
+StartupNotify=true
