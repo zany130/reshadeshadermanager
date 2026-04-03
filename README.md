@@ -77,7 +77,7 @@ Per-game projection happens under:
 ## Notes / limitations
 
 - v0.1 supports one active ReShade install state per game directory (reinstall replaces the tracked proxy binaries list; no multi-runtime merging).
-- DX8 is reserved in the model/UI but not implemented in v0.1.
+- **DirectX 8** uses **d3d8to9** (`d3d8.dll`) plus ReShade as **`d3d9.dll`**. The pinned crosire release currently ships a **32-bit** `d3d8.dll` only; **64-bit games** get a clear error at install time.
 - “Remove ReShade” is binary-only: it deletes files tracked in `installed_reshade_files` and does **not** remove shader symlinks, enabled repo state, or `ReShade.ini` by default.
 
 ## Packaging
@@ -87,7 +87,6 @@ See [packaging/README.md](packaging/README.md) for pip, wheels, optional **AppIm
 ## Roadmap (not v0.1)
 
 - CLI for scripting
-- DirectX 8 install path (reserved in UI today)
 - Multi-profile per game (currently a non-goal)
 
 Details: [CONTEXT.md](CONTEXT.md) and [PROJECT_SPEC.md](PROJECT_SPEC.md).

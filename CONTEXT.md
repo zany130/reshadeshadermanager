@@ -58,7 +58,7 @@ It is **inspired by** SteamTinkerLaunch (STL) behavior only; it does **not** dep
 4. **Remove ReShade** — Deletes **only** `installed_reshade_files`; does **not** remove shader symlinks, `enabled_repo_ids`, or `ReShade.ini` by default.
 5. **One active ReShade runtime per game (v0.1)** — On **install**, previously tracked DLLs are removed from disk before copying new ones; `installed_reshade_files` is **replaced** (no multi-runtime merge).
 6. **`latest` version** — Resolved from GitHub **tags** (`/repos/crosire/reshade/tags?per_page=100`), highest semver (not `releases/latest`, which 404’d). On failure, use `~/.cache/.../reshade_latest_cache.json`; else require explicit version.
-7. **DX8** — Present in UI/model; **not implemented** in v0.1 (install blocked with clear message).
+7. **DX8** — **d3d8to9** (`d3d8.dll`) + ReShade as `d3d9.dll`; cached under `data/d3d8to9/`. Upstream release is **32-bit PE only** — 64-bit arch → clear `RSMError` (no guess).
 8. **Git concurrency (v0.1)** — `threading.Lock` in `git_sync.py` (in-process only).
 9. **PyGObject** — Declared in `pyproject.toml`; many Fedora users install with `pip install --no-deps -e .` after `dnf install python3-gobject gtk4` to avoid building PyGObject/pycairo from pip.
 
@@ -83,7 +83,8 @@ reshadeshadermanager/
 │   │   ├── paths.py           # XDG, game_id (SHA-256 of resolved game_dir)
 │   │   ├── config.py          # config.json
 │   │   ├── manifest.py        # GameManifest, load/save games/*.json
-│   │   ├── targets.py         # GraphicsAPI, PE arch, proxy DLL names, DX8 msg
+│   │   ├── targets.py         # GraphicsAPI, PE arch, proxy DLL names, DX8 wrapper constant
+│   │   ├── d3d8to9.py         # Download/cache crosire d3d8.dll, PE arch check
 │   │   ├── ini.py             # ReShade.ini [GENERAL] search paths only
 │   │   ├── reshade.py         # GitHub tags, download, zip extract, install/remove/check
 │   │   ├── repos.py           # BUILTIN_REPOS, user repos.json, merged_catalog
@@ -151,7 +152,7 @@ reshadeshadermanager/
 Aligned with [PROJECT_SPEC.md](PROJECT_SPEC.md) deferrals and non-goals:
 
 - **CLI** for scripting installs and shader projection.
-- **DirectX 8** full install path (reserved in UI today; blocked with a clear message).
+- **DirectX 8 x64 wrapper** if upstream ships a 64-bit `d3d8.dll` (today: 32-bit only).
 - **Multi-profile per game** (explicitly a non-goal for v0.1).
 
 ---
