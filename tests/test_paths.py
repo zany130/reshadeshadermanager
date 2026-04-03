@@ -22,3 +22,4 @@ def test_rsm_paths_no_create(tmp_path: Path, monkeypatch) -> None:
     p = RsmPaths.from_env()
     assert p.config_dir == tmp_path / "cfg" / "reshade-shader-manager"
     assert p.reshade_latest_cache_path() == p.cache_dir / "reshade_latest_cache.json"
+    assert p.ui_state_json() == p.config_dir / "ui_state.json"

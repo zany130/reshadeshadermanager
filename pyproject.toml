@@ -25,6 +25,7 @@ packages = ["reshade_shader_manager"]
 [tool.hatch.build.targets.sdist]
 include = [
     "reshade_shader_manager",
+    "packaging",
     "PROJECT_SPEC.md",
     "IMPLEMENTATION_PLAN.md",
     "CONTEXT.md",

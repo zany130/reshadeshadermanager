@@ -7,6 +7,8 @@ import subprocess
 import threading
 from pathlib import Path
 
+from reshade_shader_manager.core.paths import RsmPaths
+
 log = logging.getLogger(__name__)
 
 _git_lock = threading.Lock()
@@ -44,3 +46,32 @@ def clone_or_pull(repo_dir: Path, git_url: str, *, timeout: float = 300.0, pull:
                 capture_output=True,
                 text=True,
             )
+
+
+def pull_existing_clones_for_catalog(
+    paths: RsmPaths,
+    catalog: list[dict[str, str]],
+    *,
+    timeout: float = 300.0,
+) -> list[str]:
+    """
+    For each entry in ``catalog``, if ``paths.repo_clone_dir(id)`` already has
+    ``.git``, run ``git pull``. Missing clones are skipped (no clone).
+
+    Returns a list of ``\"<repo_id>: <message>\"`` for failures; empty if every
+    pull succeeded or there was nothing to pull.
+    """
+    failures: list[str] = []
+    for r in catalog:
+        rid = r.get("id", "").strip()
+        url = (r.get("git_url") or "").strip()
+        if not rid or not url:
+            continue
+        d = paths.repo_clone_dir(rid)
+        if not (d / ".git").exists():
+            continue
+        try:
+            clone_or_pull(d, url, pull=True, timeout=timeout)
+        except Exception as e:  # noqa: BLE001
+            failures.append(f"{rid}: {e}")
+    return failures

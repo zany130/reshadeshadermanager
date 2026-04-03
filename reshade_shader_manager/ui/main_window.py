@@ -12,10 +12,14 @@ from reshade_shader_manager.core.config import load_config
 from reshade_shader_manager.core.exceptions import RSMError, VersionResolutionError
 from reshade_shader_manager.core.manifest import load_game_manifest, new_game_manifest, save_game_manifest
 from reshade_shader_manager.core.paths import get_paths
+from reshade_shader_manager.core.git_sync import pull_existing_clones_for_catalog
 from reshade_shader_manager.core.pcgw import get_pcgw_repos
 from reshade_shader_manager.core.repos import merged_catalog
 from reshade_shader_manager.core.reshade import check_reshade, install_reshade, remove_reshade_binaries
 from reshade_shader_manager.core.targets import DX8_NOT_IMPLEMENTED_MSG, detect_game_arch
+from reshade_shader_manager.core.ui_state import WindowUiState, load_window_ui_state, save_window_ui_state
+from reshade_shader_manager.ui.add_repo_dialog import AddRepoDialog
+from reshade_shader_manager.ui.error_format import format_exception_for_ui
 from reshade_shader_manager.ui.log_view import LogPanel, setup_gui_logging
 from reshade_shader_manager.ui.shader_dialog import ShaderRepoWindow
 
@@ -39,14 +43,20 @@ def _section(title: str) -> Gtk.Label:
 
 class MainWindow(Gtk.ApplicationWindow):
     def __init__(self, application: Gtk.Application) -> None:
+        paths = get_paths()
+        cfg = load_config(paths)
+        ui = load_window_ui_state(paths.ui_state_json())
+        dw = ui.width if ui else 760
+        dh = ui.height if ui else 700
         super().__init__(
             application=application,
             title="ReShade Shader Manager",
-            default_width=760,
-            default_height=700,
+            default_width=dw,
+            default_height=dh,
         )
-        self._paths = get_paths()
-        self._config = load_config(self._paths)
+        self._paths = paths
+        self._config = cfg
+        self._pending_maximize = bool(ui and ui.maximized)
         self._catalog: list[dict[str, str]] | None = None
         self._game_dir: Path | None = None
         self._exe_path: Path | None = None
@@ -88,6 +98,17 @@ class MainWindow(Gtk.ApplicationWindow):
 
         setup_gui_logging(self._log_panel)
         log.info("RSM UI ready (config %s)", self._paths.config_dir)
+
+        self.connect("close-request", self._on_close_request)
+        if self._pending_maximize:
+
+            def _max_once() -> bool:
+                if self._pending_maximize:
+                    self._pending_maximize = False
+                    self.maximize()
+                return False
+
+            GLib.idle_add(_max_once)
 
     def _build_target_section(self) -> Gtk.Widget:
         grid = Gtk.Grid(column_spacing=10, row_spacing=8)
@@ -165,14 +186,38 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def _build_shader_section(self) -> Gtk.Widget:
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        row.set_hexpand(True)
         b_ref = Gtk.Button(label="Refresh catalog")
         b_ref.connect("clicked", self._on_refresh_catalog)
+        b_pull = Gtk.Button(label="Update local clones")
+        b_pull.set_tooltip_text(
+            "Run git pull for repos that already have a clone under ~/.local/share/…/repos/"
+        )
+        b_pull.connect("clicked", self._on_update_local_clones)
+        b_add = Gtk.Button(label="Add repository…")
+        b_add.connect("clicked", self._on_add_repository)
         b_man = Gtk.Button(label="Manage shaders…")
         b_man.add_css_class("suggested-action")
         b_man.connect("clicked", self._on_manage_shaders)
         row.append(b_ref)
+        row.append(b_pull)
+        row.append(b_add)
         row.append(b_man)
         return row
+
+    def _on_close_request(self, *_args) -> bool:
+        try:
+            save_window_ui_state(
+                self._paths.ui_state_json(),
+                WindowUiState(
+                    width=self.get_width(),
+                    height=self.get_height(),
+                    maximized=self.is_maximized(),
+                ),
+            )
+        except OSError as e:
+            log.debug("Could not save window geometry: %s", e)
+        return False
 
     def _show_error(self, message: str) -> None:
         md = Gtk.MessageDialog(
@@ -365,7 +410,7 @@ class MainWindow(Gtk.ApplicationWindow):
             elif isinstance(e, RSMError):
                 self._show_error(str(e))
             else:
-                self._show_error(str(e))
+                self._show_error(format_exception_for_ui(e))
 
         self._run_worker(task, ok, err)
 
@@ -387,7 +432,7 @@ class MainWindow(Gtk.ApplicationWindow):
             self._show_info("Removed ReShade binaries (INI and shader links unchanged).")
 
         def err(e: BaseException) -> None:
-            self._show_error(str(e))
+            self._show_error(format_exception_for_ui(e))
 
         self._run_worker(task, ok, err)
 
@@ -419,9 +464,49 @@ class MainWindow(Gtk.ApplicationWindow):
             log.info("Catalog loaded: %d repos (built-in + PCGW + user)", len(cat))
 
         def err(e: BaseException) -> None:
-            self._show_error(f"Catalog refresh failed:\n{e}")
+            self._show_error(f"Catalog refresh failed:\n{format_exception_for_ui(e)}")
 
         self._run_worker(task, ok, err)
+
+    def _on_update_local_clones(self, _btn: Gtk.Button) -> None:
+        if not self._catalog:
+            self._show_error("Refresh catalog first so RSM knows which repositories to update.")
+            return
+
+        def task():
+            return pull_existing_clones_for_catalog(self._paths, self._catalog)
+
+        def ok(failures: list[str]) -> None:
+            if failures:
+                self._show_error(
+                    "Some repositories failed to update:\n\n" + "\n".join(failures[:20])
+                    + ("\n…" if len(failures) > 20 else "")
+                )
+            else:
+                self._show_info(
+                    "Local clones updated (git pull ran for each catalog repo that already had a clone)."
+                )
+
+        def err(e: BaseException) -> None:
+            self._show_error(format_exception_for_ui(e))
+
+        self._run_worker(task, ok, err)
+
+    def _on_add_repository(self, _btn: Gtk.Button) -> None:
+        def refresh_catalog() -> None:
+            try:
+                pcgw = get_pcgw_repos(
+                    self._paths,
+                    ttl_hours=self._config.pcgw_cache_ttl_hours,
+                    force_refresh=False,
+                )
+                self._catalog = merged_catalog(self._paths, pcgw)
+                log.info("Catalog reloaded after adding user repo (%d entries)", len(self._catalog))
+            except Exception as e:  # noqa: BLE001
+                log.warning("Could not reload catalog: %s", e)
+
+        win = AddRepoDialog(parent=self, paths=self._paths, on_saved=refresh_catalog)
+        win.present()
 
     def _on_manage_shaders(self, _btn: Gtk.Button) -> None:
         if not self._game_dir:

@@ -13,6 +13,7 @@ from reshade_shader_manager.core.config import AppConfig
 from reshade_shader_manager.core.link_farm import apply_shader_projection
 from reshade_shader_manager.core.manifest import load_game_manifest, new_game_manifest
 from reshade_shader_manager.core.paths import RsmPaths
+from reshade_shader_manager.ui.error_format import format_exception_for_ui
 
 log = logging.getLogger(__name__)
 
@@ -131,7 +132,7 @@ class ShaderRepoWindow(Gtk.Window):
                 modal=True,
                 message_type=Gtk.MessageType.ERROR,
                 buttons=Gtk.ButtonsType.CLOSE,
-                text=f"Shader apply failed:\n{exc}",
+                text=f"Shader apply failed:\n{format_exception_for_ui(exc)}",
             )
             md.present()
             md.connect("response", lambda w, *_: w.destroy())

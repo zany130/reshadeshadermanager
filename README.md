@@ -14,8 +14,10 @@ GTK UI (v0.1) is a thin frontend over a metadata-driven backend core.
 - Select graphics API (`opengl`, `dx9`, `dx10`, `dx11`, `dx12`) and ReShade variant (`standard`/`addon`)
 - Install / remove ReShade binaries
 - Check that installed ReShade binaries exist
-- Refresh + manage shader repos (built-in + user repos + cached PCGamingWiki results)
-- Enable/disable shader repos for the selected game (reversible symlink projection)
+- Refresh shader catalog (built-in + user `repos.json` + cached PCGamingWiki)
+- **Add repository…** to append a custom Git repo to `~/.config/.../repos.json`
+- **Update local clones** — `git pull` for catalog repos that already have a clone (Apply does not pull)
+- Manage shaders: enable/disable repos for the selected game (full symlink rebuild on Apply)
 - Log panel showing backend progress/errors
 
 ## Requirements
@@ -54,7 +56,8 @@ reshade-shader-manager
 3. Choose **Graphics API**, **Variant**, and **Version**.
    - If you leave version as `latest`, RSM resolves it via GitHub *tags*; if the network fails and no cached value exists, you must enter an explicit version like `6.7.3`.
 4. Click **Install**.
-5. Click **Refresh catalog** then **Manage shaders…** to enable/disable repos for that game.
+5. Click **Refresh catalog**. Use **Update local clones** if you want newer commits from Git before applying.
+6. **Manage shaders…** to enable/disable repos for that game, then **Apply** (recreates projection; does not run `git pull`).
 
 ## Data locations (XDG)
 
@@ -68,7 +71,7 @@ Per-game projection happens under:
 
 - `<game>/ReShade.ini`
 - `<game>/<ReShade proxy dll>.dll` + optional `d3dcompiler_47.dll`
-- `<game>/reshade-shaders/Shaders/<repo-id>` and `.../Textures/<repo-id>` as *directory symlinks*
+- `<game>/reshade-shaders/Shaders/<repo-id>` and `.../Textures/<repo-id>` — usually *directory* symlinks; non-standard repos may use per-file symlinks preserving paths
 
 ## Notes / limitations
 
@@ -76,10 +79,24 @@ Per-game projection happens under:
 - DX8 is reserved in the model/UI but not implemented in v0.1.
 - “Remove ReShade” is binary-only: it deletes files tracked in `installed_reshade_files` and does **not** remove shader symlinks, enabled repo state, or `ReShade.ini` by default.
 
+## Packaging
+
+See [packaging/README.md](packaging/README.md) for pip, wheels, Flatpak notes, and distro hints.
+
+## Roadmap (not v0.1)
+
+- CLI for scripting
+- Richer ReShade version / auto-bump UX
+- DirectX 8 install path (reserved in UI today)
+- Multi-profile per game (currently a non-goal)
+
+Details: [CONTEXT.md](CONTEXT.md) and [PROJECT_SPEC.md](PROJECT_SPEC.md).
+
 ## Development
 
 See:
 
 - `PROJECT_SPEC.md`
 - `IMPLEMENTATION_PLAN.md`
+- `CONTEXT.md`
 

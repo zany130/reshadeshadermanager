@@ -10,7 +10,7 @@
 
 - Installs / removes / checks **ReShade** into a user-chosen game directory (Wine/Proton-oriented).
 - Manages **Git-based shader repositories** (clone/pull, catalog merge).
-- **Projects** enabled repos into `<game>/reshade-shaders/` using **directory symlinks** (no per-file symlinks, no flattening, no renaming shader files).
+- **Projects** enabled repos into `<game>/reshade-shaders/` using **directory symlinks** where possible; non-standard repo layouts use **per-file symlinks** that preserve relative paths (no renaming shader files).
 
 It is **inspired by** SteamTinkerLaunch (STL) behavior only; it does **not** depend on STL or replicate its shell architecture.
 
@@ -44,7 +44,7 @@ It is **inspired by** SteamTinkerLaunch (STL) behavior only; it does **not** dep
 
 ### Per-game tree (managed)
 
-- `<game>/ReShade.ini` — RSM patches only `EffectSearchPaths` / `TextureSearchPaths` under `[GENERAL]` (Windows-style `.\reshade-shaders\...**`).
+- `<game>/ReShade.ini` — RSM patches only `EffectSearchPaths` / `TextureSearchPaths` under `[GENERAL]` (Windows-style recursive globs `.\reshade-shaders\Shaders\**` and `.\reshade-shaders\Textures\**`).
 - Proxy DLL(s) + optional `d3dcompiler_47.dll` — tracked in `installed_reshade_files`.
 - `reshade-shaders/Shaders/<repo-id>` → symlink to `.../share/.../repos/<repo-id>/Shaders` (same for `Textures/`). **Absolute** symlink targets; manifest stores **absolute paths to the symlink inodes** under the game dir (not `resolve()` through the link).
 
@@ -88,18 +88,27 @@ reshadeshadermanager/
 │   │   ├── reshade.py         # GitHub tags, download, zip extract, install/remove/check
 │   │   ├── repos.py           # BUILTIN_REPOS, user repos.json, merged_catalog
 │   │   ├── pcgw.py            # MediaWiki API, parse HTML → repo list, cache
-│   │   ├── git_sync.py        # clone/pull + lock
-│   │   └── link_farm.py       # enable/disable directory symlinks
+│   │   ├── git_sync.py        # clone/pull + lock; pull_existing_clones_for_catalog
+│   │   ├── ui_state.py        # window geometry JSON (no GTK)
+│   │   └── link_farm.py       # apply_shader_projection, enable/disable, layouts
 │   └── ui/
 │       ├── __init__.py
 │       ├── log_view.py        # LogPanel, GtkLogHandler, setup_gui_logging
+│       ├── error_format.py    # user-facing exception strings
 │       ├── main_window.py     # Target, ReShade, shader buttons, workers
-│       └── shader_dialog.py   # ShaderRepoWindow checklist + apply
+│       ├── shader_dialog.py   # ShaderRepoWindow checklist + apply
+│       └── add_repo_dialog.py # Add user repo → repos.json
 └── tests/
     ├── conftest.py
     ├── test_paths.py
     ├── test_ini.py
     ├── test_manifest.py
+    ├── test_paths.py
+    ├── test_ui_state.py
+    ├── test_reshade_version.py
+    ├── test_git_sync.py
+    ├── test_repos.py
+    ├── test_error_format.py
     ├── test_backend_flows.py  # Integration-style: fake zip, mock git, PCGW fixture
     └── fixtures/pcgw_sample.html
 ```
@@ -121,21 +130,30 @@ reshadeshadermanager/
 
 ## Current progress (as of this document)
 
-- **Backend:** Implemented and covered by tests (`pytest tests/` — includes flow tests with fake ReShade zip and mocked `clone_or_pull`; optional live PCGW with `RSM_NETWORK_TEST=1`).
-- **GTK UI:** Minimal v0.1 — game dir + optional exe, arch display, API/variant/version, Install/Remove/Check, Refresh catalog + Manage shaders dialog, log panel.
-- **README:** GitHub-oriented setup (system PyGObject, `pip install --no-deps -e .`).
-- **Known user environment:** `releases/latest` 404 → fixed by tags-based `latest`; pip PyGObject build fails without cairo → documented workaround.
+- **Backend:** ReShade install/remove/check, INI search paths, PCGW fetch/cache, `merged_catalog`, `apply_shader_projection` (full rebuild on Apply; `git_pull=False` on Apply), non-standard repo layouts (nested dirs + file fallback), safe symlink removal under `reshade-shaders/`. Tests: `pytest tests/` (fake zip, mocked git; optional live PCGW with `RSM_NETWORK_TEST=1`).
+- **GTK UI:** Game dir + optional exe, arch, API/variant/version, Install/Remove/Check, Refresh catalog, **Update local clones** (`git pull` for existing clones in the current catalog), **Add repository…** (user `repos.json`), Manage shaders (checklist + Apply), log panel, **window geometry** persistence (`ui_state.json`).
+- **README / packaging:** See [README.md](README.md) and [packaging/README.md](packaging/README.md) for install and distribution notes.
+- **Known environment:** `latest` resolved via GitHub tags (not `releases/latest`); system `python3-gobject` + `pip install --no-deps -e .` avoids pip-building PyGObject without cairo.
 
 ---
 
-## Next steps (suggested)
+## Next steps (optional polish)
 
-1. **Packaging:** Flatpak or distro package; document optional `pip install -e .` vs system deps clearly.
-2. **Hardening:** More edge cases (empty extract, addon filename mismatch, repo without Shaders/Textures — already warn/skip).
-3. **UX:** Persist/restore window geometry; optional “Save target only” clarity; better error strings for network/Git.
-4. **Tests:** Headless GTK smoke optional; more unit tests for `fetch_latest_reshade_version_from_github` with mocked HTTP.
-5. **Deferred per spec:** CLI, auto ReShade version bump, DX8 implementation, multi-profile per game.
-6. **pyproject:** Consider adding `CONTEXT.md` to `[tool.hatch.build.targets.sdist] include` if you want it in source distributions.
+1. **Hardening:** Empty ReShade extract, addon filename drift, duplicate INI keys in `[GENERAL]` (v0.1 only updates first occurrence).
+2. **Tests:** Headless GTK smoke; HTTP-mocked test for full `fetch_latest_reshade_version_from_github` (parser-only tests exist).
+3. **Multi-instance:** Git lock is in-process only; document or add file locking if two RSM instances become a problem.
+4. **Flatpak:** Example manifest in [packaging/](packaging/); publish to Flathub when ready.
+
+---
+
+## Future milestones (not v0.1)
+
+Aligned with [PROJECT_SPEC.md](PROJECT_SPEC.md) deferrals and non-goals:
+
+- **CLI** for scripting installs and shader projection.
+- **Auto ReShade version bump** / richer update UX beyond manual version + `latest`.
+- **DirectX 8** full install path (reserved in UI today; blocked with a clear message).
+- **Multi-profile per game** (explicitly a non-goal for v0.1).
 
 ---
 

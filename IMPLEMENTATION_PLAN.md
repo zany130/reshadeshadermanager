@@ -331,8 +331,8 @@ Verified offline (fake ReShade zip + mocked `clone_or_pull`) unless `RSM_NETWORK
 ### `ReShade.ini` output
 
 - Created or patched under `game_dir/ReShade.ini` with a `[GENERAL]` section containing:
-  - `EffectSearchPaths=.\reshade-shaders\Shaders**`
-  - `TextureSearchPaths=.\reshade-shaders\Textures**`
+  - `EffectSearchPaths=.\reshade-shaders\Shaders\**`
+  - `TextureSearchPaths=.\reshade-shaders\Textures\**`
 - Other sections/keys are preserved when present; first matching key in `[GENERAL]` is updated (see §0b.3).
 
 ### PCGW parsed repo records

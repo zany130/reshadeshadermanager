@@ -261,8 +261,8 @@ Rules
 
 ⚙️ ReShade.ini
 
-EffectSearchPaths=.\reshade-shaders\Shaders**
-TextureSearchPaths=.\reshade-shaders\Textures**
+EffectSearchPaths=.\reshade-shaders\Shaders\**
+TextureSearchPaths=.\reshade-shaders\Textures\**
 
 Recursive lookup is required.
 

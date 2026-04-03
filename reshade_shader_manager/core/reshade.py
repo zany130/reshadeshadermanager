@@ -63,14 +63,12 @@ def _write_latest_cache(path: Path, version: str) -> None:
     tmp.replace(path)
 
 
-def fetch_latest_reshade_version_from_github() -> str:
+def parse_latest_reshade_version_from_github_tags_payload(data: Any) -> str:
     """
-    Resolve "latest" from GitHub tags for ``crosire/reshade``.
+    Parse JSON from GitHub ``GET /repos/crosire/reshade/tags`` (list of tag objects).
 
-    Note: GitHub's ``/releases/latest`` endpoint is returning 404 in this environment,
-    but the tags endpoint works and includes versions like ``v6.7.3``.
+    Returns the highest ``x.y.z`` semver string found in ``name`` fields (``v`` prefix allowed).
     """
-    data = _http_json_get(RESHADE_GITHUB_TAGS_API)
     if not isinstance(data, list):
         raise VersionResolutionError("GitHub API response missing tag list")
 
@@ -81,7 +79,6 @@ def fetch_latest_reshade_version_from_github() -> str:
         name = item.get("name")
         if not isinstance(name, str):
             continue
-        # Expect tags like v6.7.3
         raw = name.strip()
         if raw[:1] in ("v", "V"):
             raw = raw[1:]
@@ -97,6 +94,17 @@ def fetch_latest_reshade_version_from_github() -> str:
 
     v = max(versions)
     return f"{v[0]}.{v[1]}.{v[2]}"
+
+
+def fetch_latest_reshade_version_from_github() -> str:
+    """
+    Resolve "latest" from GitHub tags for ``crosire/reshade``.
+
+    Note: GitHub's ``/releases/latest`` endpoint is returning 404 in this environment,
+    but the tags endpoint works and includes versions like ``v6.7.3``.
+    """
+    data = _http_json_get(RESHADE_GITHUB_TAGS_API)
+    return parse_latest_reshade_version_from_github_tags_payload(data)
 
 
 def resolve_reshade_version(requested: str, paths: RsmPaths) -> str:

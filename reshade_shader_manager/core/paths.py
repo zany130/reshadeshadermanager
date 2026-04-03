@@ -48,6 +48,9 @@ class RsmPaths:
     def config_json(self) -> Path:
         return self.config_dir / "config.json"
 
+    def ui_state_json(self) -> Path:
+        return self.config_dir / "ui_state.json"
+
     def repos_json(self) -> Path:
         return self.config_dir / "repos.json"
 
