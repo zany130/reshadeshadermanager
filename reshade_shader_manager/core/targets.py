@@ -1,4 +1,4 @@
-"""Game target: paths, PE architecture, graphics API (incl. deferred dx8)."""
+"""Game target: paths, PE architecture, graphics API (incl. DX8 via d3d8to9)."""
 
 from __future__ import annotations
 
@@ -6,9 +6,8 @@ import struct
 from enum import Enum
 from pathlib import Path
 
-DX8_NOT_IMPLEMENTED_MSG = (
-    "DirectX 8 is not implemented in v0.1; choose another API or install ReShade manually."
-)
+# DirectX 8 uses d3d8to9 (``d3d8.dll``) + ReShade as ``d3d9.dll``; see ``reshade.install_reshade``.
+DX8_WRAPPER_BASENAME = "d3d8.dll"
 
 
 class GraphicsAPI(str, Enum):
@@ -73,11 +72,12 @@ def detect_game_arch(game_dir: Path, game_exe: Path | None) -> str:
 
 
 def proxy_dll_for_api(api: GraphicsAPI) -> str:
-    """Destination basename for the ReShade proxy DLL (v0.1: dx8 not installable)."""
+    """Destination basename for the ReShade proxy DLL (after any API-specific wrapper)."""
     if api is GraphicsAPI.OPENGL:
         return "opengl32.dll"
     if api is GraphicsAPI.DX8:
-        raise ValueError(DX8_NOT_IMPLEMENTED_MSG)
+        # d3d8to9 supplies ``d3d8.dll``; ReShade loads as D3D9.
+        return "d3d9.dll"
     if api is GraphicsAPI.DX9:
         return "d3d9.dll"
     if api in (GraphicsAPI.DX10, GraphicsAPI.DX11, GraphicsAPI.DX12):

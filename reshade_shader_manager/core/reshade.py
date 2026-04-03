@@ -16,7 +16,8 @@ from reshade_shader_manager.core.exceptions import RSMError, VersionResolutionEr
 from reshade_shader_manager.core.ini import ensure_search_paths_in_ini
 from reshade_shader_manager.core.manifest import GameManifest, save_game_manifest
 from reshade_shader_manager.core.paths import RsmPaths
-from reshade_shader_manager.core.targets import DX8_NOT_IMPLEMENTED_MSG, GraphicsAPI, proxy_dll_for_api
+from reshade_shader_manager.core.d3d8to9 import ensure_d3d8to9_dll
+from reshade_shader_manager.core.targets import DX8_WRAPPER_BASENAME, GraphicsAPI, proxy_dll_for_api
 
 log = logging.getLogger(__name__)
 
@@ -209,11 +210,12 @@ def install_reshade(
     API (e.g. ``dxgi.dll`` → ``opengl32.dll``) does not leave orphan proxies. The manifest
     list is then **replaced** with the new install set (no merge across runs).
 
+    **DX8:** installs crosire ``d3d8to9`` as ``d3d8.dll`` and ReShade as ``d3d9.dll`` (32-bit games only
+    with current upstream release).
+
     Does not clear shader symlinks or ``enabled_repo_ids``. Does not delete ``ReShade.ini``.
     """
     api = GraphicsAPI(graphics_api)
-    if api is GraphicsAPI.DX8:
-        raise RSMError(DX8_NOT_IMPLEMENTED_MSG)
 
     game_dir = Path(manifest.game_dir)
     if not game_dir.is_dir():
@@ -235,6 +237,10 @@ def install_reshade(
     dest_name = proxy_dll_for_api(api)
 
     installed: list[str] = []
+    if api is GraphicsAPI.DX8:
+        wrapper_src = ensure_d3d8to9_dll(paths, arch=manifest.reshade_arch)
+        shutil.copy2(wrapper_src, game_dir / DX8_WRAPPER_BASENAME)
+        installed.append(DX8_WRAPPER_BASENAME)
     shutil.copy2(reshade_src, game_dir / dest_name)
     installed.append(dest_name)
     if d3d_src is not None:
