@@ -357,7 +357,7 @@ Included
 - optional exe
 - detect arch
 - choose API
-- install/remove/check ReShade
+- install/remove/check ReShade; explicit update/reinstall latest (no automatic bump in RSM)
 - addon + standard support
 - add custom repo
 - clone/update repo
@@ -371,7 +371,7 @@ Included
 
 Deferred
 
-- Auto ReShade version discovery/bumping
+- Automatic ReShade version bumping or background update notifications in RSM (ReShade’s own UI covers in-game notices; RSM provides **Update / Reinstall Latest** and version field + `latest` on Install)
 - CLI interface
 
 ---

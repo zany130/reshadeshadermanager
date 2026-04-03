@@ -12,7 +12,7 @@ GTK UI (v0.1) is a thin frontend over a metadata-driven backend core.
 
 - Pick a game directory (+ optional `.exe` to detect 32/64-bit)
 - Select graphics API (`opengl`, `dx9`, `dx10`, `dx11`, `dx12`) and ReShade variant (`standard`/`addon`)
-- Install / remove ReShade binaries
+- Install / remove ReShade binaries; **Update / Reinstall Latest** resolves current upstream `latest` (GitHub tags / cache) for the selected standard or addon variant and reinstalls
 - Check that installed ReShade binaries exist
 - Refresh shader catalog (built-in + user `repos.json` + cached PCGamingWiki)
 - **Add repository…** to append a custom Git repo to `~/.config/.../repos.json`
@@ -55,7 +55,7 @@ reshade-shader-manager
 2. Optionally choose **Game executable…** (or rely on the directory scan) so architecture becomes `32-bit` or `64-bit`.
 3. Choose **Graphics API**, **Variant**, and **Version**.
    - If you leave version as `latest`, RSM resolves it via GitHub *tags*; if the network fails and no cached value exists, you must enter an explicit version like `6.7.3`.
-4. Click **Install**.
+4. Click **Install**, or use **Update / Reinstall Latest** anytime to pull the newest ReShade build for the selected API and variant (no background updater in RSM; ReShade notifies in-game when applicable).
 5. Click **Refresh catalog**. Use **Update local clones** if you want newer commits from Git before applying.
 6. **Manage shaders…** to enable/disable repos for that game, then **Apply** (recreates projection; does not run `git pull`).
 
@@ -86,7 +86,6 @@ See [packaging/README.md](packaging/README.md) for pip, wheels, Flatpak notes, a
 ## Roadmap (not v0.1)
 
 - CLI for scripting
-- Richer ReShade version / auto-bump UX
 - DirectX 8 install path (reserved in UI today)
 - Multi-profile per game (currently a non-goal)
 

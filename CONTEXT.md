@@ -124,14 +124,14 @@ reshadeshadermanager/
 - **No flattening** shader repos; **no renaming** shader files.
 - **STL = reference only** — do not port shell/YAD patterns as architecture.
 - **Backend/UI split** — Keep core importable without GTK; avoid heavy logic in UI files.
-- **v0.1 scope** — Avoid scope creep (no CLI required yet per spec deferral; no auto-bump ReShade).
+- **v0.1 scope** — Avoid scope creep (no CLI required yet per spec deferral). ReShade updates: use **Update / Reinstall Latest** in the UI or Install with version `latest`; no RSM background version notifier (ReShade itself warns in-game when newer builds exist).
 
 ---
 
 ## Current progress (as of this document)
 
 - **Backend:** ReShade install/remove/check, INI search paths, PCGW fetch/cache, `merged_catalog`, `apply_shader_projection` (full rebuild on Apply; `git_pull=False` on Apply), non-standard repo layouts (nested dirs + file fallback), safe symlink removal under `reshade-shaders/`. Tests: `pytest tests/` (fake zip, mocked git; optional live PCGW with `RSM_NETWORK_TEST=1`).
-- **GTK UI:** Game dir + optional exe, arch, API/variant/version, Install/Remove/Check, Refresh catalog, **Update local clones** (`git pull` for existing clones in the current catalog), **Add repository…** (user `repos.json`), Manage shaders (checklist + Apply), log panel, **window geometry** persistence (`ui_state.json`).
+- **GTK UI:** Game dir + optional exe, arch, API/variant/version, Install, **Update / Reinstall Latest** (resolve upstream `latest` at click time, same API/variant), Remove/Check, Refresh catalog, **Update local clones** (`git pull` for existing clones in the current catalog), **Add repository…** (user `repos.json`), Manage shaders (checklist + Apply), log panel, **window geometry** persistence (`ui_state.json`).
 - **README / packaging:** See [README.md](README.md) and [packaging/README.md](packaging/README.md) for install and distribution notes.
 - **Known environment:** `latest` resolved via GitHub tags (not `releases/latest`); system `python3-gobject` + `pip install --no-deps -e .` avoids pip-building PyGObject without cairo.
 
@@ -151,7 +151,6 @@ reshadeshadermanager/
 Aligned with [PROJECT_SPEC.md](PROJECT_SPEC.md) deferrals and non-goals:
 
 - **CLI** for scripting installs and shader projection.
-- **Auto ReShade version bump** / richer update UX beyond manual version + `latest`.
 - **DirectX 8** full install path (reserved in UI today; blocked with a clear message).
 - **Multi-profile per game** (explicitly a non-goal for v0.1).
 

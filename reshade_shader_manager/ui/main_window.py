@@ -10,7 +10,12 @@ from gi.repository import Gio, GLib, Gtk, Pango
 
 from reshade_shader_manager.core.config import load_config
 from reshade_shader_manager.core.exceptions import RSMError, VersionResolutionError
-from reshade_shader_manager.core.manifest import load_game_manifest, new_game_manifest, save_game_manifest
+from reshade_shader_manager.core.manifest import (
+    GameManifest,
+    load_game_manifest,
+    new_game_manifest,
+    save_game_manifest,
+)
 from reshade_shader_manager.core.paths import get_paths
 from reshade_shader_manager.core.git_sync import pull_existing_clones_for_catalog
 from reshade_shader_manager.core.pcgw import get_pcgw_repos
@@ -170,11 +175,18 @@ class MainWindow(Gtk.ApplicationWindow):
         bi = Gtk.Button(label="Install")
         bi.add_css_class("suggested-action")
         bi.connect("clicked", self._on_install)
+        bu = Gtk.Button(label="Update / Reinstall Latest")
+        bu.set_tooltip_text(
+            "Resolve the current latest ReShade from GitHub (or cache) and reinstall using the "
+            "selected graphics API and standard/addon variant. Does not run in the background."
+        )
+        bu.connect("clicked", self._on_update_reinstall_latest)
         br = Gtk.Button(label="Remove binaries")
         br.connect("clicked", self._on_remove)
         bc = Gtk.Button(label="Check")
         bc.connect("clicked", self._on_check)
         row.append(bi)
+        row.append(bu)
         row.append(br)
         row.append(bc)
         grid.attach(row, 0, 3, 2, 1)
@@ -403,6 +415,49 @@ class MainWindow(Gtk.ApplicationWindow):
         def ok(_r) -> None:
             log.info("Install finished.")
             self._show_info("ReShade install finished.")
+
+        def err(e: BaseException) -> None:
+            if isinstance(e, VersionResolutionError):
+                self._show_error(str(e))
+            elif isinstance(e, RSMError):
+                self._show_error(str(e))
+            else:
+                self._show_error(format_exception_for_ui(e))
+
+        self._run_worker(task, ok, err)
+
+    def _on_update_reinstall_latest(self, _btn: Gtk.Button) -> None:
+        if not self._game_dir:
+            self._show_error("Select a game directory.")
+            return
+        if self._arch_value not in ("32", "64"):
+            self._show_error(
+                "Could not detect 32/64-bit architecture. Add a Windows .exe (optional chooser) "
+                "or place an .exe in the game folder."
+            )
+            return
+        api = self._api_combo.get_active_id()
+        if api == "dx8":
+            self._show_error(DX8_NOT_IMPLEMENTED_MSG)
+            return
+        m = self._sync_manifest_from_ui()
+
+        def task():
+            return install_reshade(
+                paths=self._paths,
+                manifest=m,
+                graphics_api=m.graphics_api,
+                reshade_version="latest",
+                variant=m.reshade_variant,
+                create_ini_if_missing=self._config.create_ini_if_missing,
+            )
+
+        def ok(result: GameManifest) -> None:
+            ver = result.reshade_version
+            self._version_entry.set_text(ver)
+            self._persist_target_metadata()
+            log.info("ReShade update/reinstall finished (%s).", ver)
+            self._show_info(f"ReShade updated to {ver}.")
 
         def err(e: BaseException) -> None:
             if isinstance(e, VersionResolutionError):
