@@ -10,7 +10,7 @@ from typing import Callable
 from gi.repository import GLib, Gtk
 
 from reshade_shader_manager.core.config import AppConfig
-from reshade_shader_manager.core.link_farm import disable_shader_repo, enable_shader_repo
+from reshade_shader_manager.core.link_farm import apply_shader_projection
 from reshade_shader_manager.core.manifest import load_game_manifest, new_game_manifest
 from reshade_shader_manager.core.paths import RsmPaths
 
@@ -103,35 +103,18 @@ class ShaderRepoWindow(Gtk.Window):
         desired = {rid for rid, cb in self._checks.items() if cb.get_active()}
 
         def work() -> None:
-            m0 = load_game_manifest(self._paths, self._game_dir) or new_game_manifest(
-                self._game_dir
-            )
-            current = set(m0.enabled_repo_ids)
             by_id = {r["id"]: r for r in self._catalog}
-
-            for rid in sorted(current - desired):
-                log.info("Disabling repo %s", rid)
-                m = load_game_manifest(self._paths, self._game_dir) or new_game_manifest(
-                    self._game_dir
-                )
-                disable_shader_repo(paths=self._paths, manifest=m, repo_id=rid)
-
-            for rid in sorted(desired - current):
-                if rid not in by_id:
-                    log.warning("Unknown repo id %r — skipped", rid)
-                    continue
-                url = by_id[rid]["git_url"]
-                log.info("Enabling repo %s", rid)
-                m = load_game_manifest(self._paths, self._game_dir) or new_game_manifest(
-                    self._game_dir
-                )
-                enable_shader_repo(
-                    paths=self._paths,
-                    manifest=m,
-                    repo_id=rid,
-                    git_url=url,
-                    pull=self._app_config.shader_download_enabled,
-                )
+            log.info(
+                "Applying shader projection for %d repo(s) (full rebuild; no git pull)",
+                len(desired),
+            )
+            apply_shader_projection(
+                paths=self._paths,
+                game_dir=self._game_dir,
+                desired_repo_ids=desired,
+                catalog_by_id=by_id,
+                git_pull=False,
+            )
 
         def ok(_: object = None) -> None:
             if self._apply_btn:

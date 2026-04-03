@@ -16,7 +16,14 @@ import pytest
 
 from reshade_shader_manager.core import reshade as reshade_mod
 from reshade_shader_manager.core.ini import DEFAULT_EFFECT_SEARCH, DEFAULT_TEXTURE_SEARCH
-from reshade_shader_manager.core.link_farm import disable_shader_repo, enable_shader_repo
+import shutil
+
+from reshade_shader_manager.core.link_farm import (
+    apply_shader_projection,
+    disable_shader_repo,
+    enable_shader_repo,
+    unlink_recorded_projection_path,
+)
 from reshade_shader_manager.core.manifest import GameManifest, load_game_manifest, new_game_manifest
 from reshade_shader_manager.core.pcgw import fetch_pcgw_repos_raw, parse_pcgw_repos_from_html
 from reshade_shader_manager.core.paths import RsmPaths
@@ -50,8 +57,8 @@ def fake_git_repo(monkeypatch: pytest.MonkeyPatch) -> None:
 
     def _fake(repo_dir: Path, git_url: str, **kwargs: object) -> None:
         repo_dir.mkdir(parents=True, exist_ok=True)
-        (repo_dir / "Shaders").mkdir()
-        (repo_dir / "Textures").mkdir()
+        (repo_dir / "Shaders").mkdir(exist_ok=True)
+        (repo_dir / "Textures").mkdir(exist_ok=True)
         (repo_dir / "Shaders" / "test.fx").write_text("//x", encoding="utf-8")
         (repo_dir / "Textures" / "t.png").write_bytes(b"\x89PNG\r\n")
 
@@ -125,6 +132,52 @@ def test_reinstall_replaces_proxy_and_manifest_list(
     assert m2.installed_reshade_files == ["opengl32.dll", "d3dcompiler_47.dll"]
 
 
+def test_apply_rebuild_recreates_symlinks_after_manual_delete(
+    tmp_path: Path, rsm_paths: RsmPaths, fake_git_repo: None
+) -> None:
+    """Apply always rebuilds from metadata + clone; survives deleted reshade-shaders tree."""
+    game = tmp_path / "game_reapply"
+    game.mkdir(parents=True)
+    cat = {"testrepo": {"id": "testrepo", "git_url": "https://example.com/none.git"}}
+    apply_shader_projection(
+        paths=rsm_paths,
+        game_dir=game,
+        desired_repo_ids={"testrepo"},
+        catalog_by_id=cat,
+        git_pull=True,
+    )
+    m1 = load_game_manifest(rsm_paths, game)
+    assert m1 is not None
+    links_before = list(m1.symlinks_by_repo_id.get("testrepo", []))
+    assert links_before
+    assert (game / "reshade-shaders" / "Shaders" / "testrepo" / "test.fx").is_file()
+
+    shutil.rmtree(game / "reshade-shaders")
+    for lp in links_before:
+        assert not Path(lp).exists()
+
+    apply_shader_projection(
+        paths=rsm_paths,
+        game_dir=game,
+        desired_repo_ids={"testrepo"},
+        catalog_by_id=cat,
+        git_pull=False,
+    )
+    m2 = load_game_manifest(rsm_paths, game)
+    assert m2 is not None
+    assert "testrepo" in m2.enabled_repo_ids
+    assert (game / "reshade-shaders" / "Shaders" / "testrepo" / "test.fx").is_file()
+
+
+def test_unlink_recorded_skips_non_symlink(tmp_path: Path) -> None:
+    game = tmp_path / "g"
+    (game / "reshade-shaders" / "Shaders" / "r").mkdir(parents=True)
+    p = game / "reshade-shaders" / "Shaders" / "r" / "real.fx"
+    p.write_text("//x", encoding="utf-8")
+    unlink_recorded_projection_path(game.resolve(), p)
+    assert p.is_file()
+
+
 def test_enable_disable_shader_repo(tmp_path: Path, rsm_paths: RsmPaths, fake_git_repo: None) -> None:
     game = tmp_path / "game_shaders"
     game.mkdir(parents=True)
@@ -135,7 +188,7 @@ def test_enable_disable_shader_repo(tmp_path: Path, rsm_paths: RsmPaths, fake_gi
         manifest=m,
         repo_id="testrepo",
         git_url="https://example.com/none.git",
-        pull=True,
+        git_pull=True,
     )
     assert ok is True
     m2 = load_game_manifest(rsm_paths, game)
@@ -208,7 +261,7 @@ def test_remove_reshade_leaves_shaders_and_enabled(
         manifest=m_loaded,
         repo_id="keepme",
         git_url="https://example.com/x.git",
-        pull=True,
+        git_pull=True,
     )
     m2 = load_game_manifest(rsm_paths, game)
     assert m2 is not None
