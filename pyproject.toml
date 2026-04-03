@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "reshade-shader-manager"
+version = "0.1.0"
+description = "Standalone ReShade and shader-repo manager for Linux (GTK 4 UI)"
+readme = "PROJECT_SPEC.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "PyGObject>=3.42",
+]
+
+[project.scripts]
+reshade-shader-manager = "reshade_shader_manager.main:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["reshade_shader_manager"]
+
+[tool.hatch.build.targets.sdist]
+include = ["reshade_shader_manager", "PROJECT_SPEC.md", "IMPLEMENTATION_PLAN.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "integration: optional tests that require network (enable with RSM_NETWORK_TEST=1)",
+]
