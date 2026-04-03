@@ -47,20 +47,20 @@ class AddRepoDialog(Gtk.Window):
         self._id_entry = Gtk.Entry()
         self._id_entry.set_placeholder_text("e.g. my-pack")
         self._id_entry.set_tooltip_text(
-            "This short name is used everywhere on disk: your game gets folders "
-            "reshade-shaders/Shaders/THIS and …/Textures/THIS, and the Git clone lives under "
-            "RSM data in repos/THIS. Use lowercase letters, digits, dashes, and underscores only. "
-            "Must differ from built-in repo IDs (e.g. quint, reshade-shaders)."
+            "Short identifier used on disk: your game gets reshade-shaders/Shaders/THIS and "
+            "…/Textures/THIS, and the Git clone is stored under RSM data in repos/THIS. "
+            "Lowercase letters, digits, dashes, and underscores only. "
+            "Must not match built-in names (e.g. quint, reshade-shaders)."
         )
-        row(0, "Folder name (ID)", self._id_entry)
+        row(0, "Repo name", self._id_entry)
 
         self._name_entry = Gtk.Entry()
         self._name_entry.set_placeholder_text("e.g. My shader pack")
         self._name_entry.set_tooltip_text(
-            "Human-readable title shown in the Manage shaders list only. "
-            "If you leave it empty, the folder name is used."
+            "Optional friendly label in the Manage shaders list. "
+            "If you leave it empty, the repo name is shown instead."
         )
-        row(1, "Display name", self._name_entry)
+        row(1, "Friendly name", self._name_entry)
 
         self._url_entry = Gtk.Entry()
         self._url_entry.set_hexpand(True)
@@ -79,9 +79,9 @@ class AddRepoDialog(Gtk.Window):
 
         hint = Gtk.Label(
             label=(
-                "Folder name (ID) must be unique among your saved repos and must not match a "
-                "built-in ID. If a PCGamingWiki entry uses the same ID, your custom repo replaces "
-                "that catalog entry when lists are merged."
+                "Repo name must be unique among your saved repos and must not match a built-in "
+                "repo name. If PCGamingWiki lists the same repo name, your entry wins when catalogs "
+                "are merged."
             ),
             xalign=0.0,
             wrap=True,
@@ -109,7 +109,7 @@ class AddRepoDialog(Gtk.Window):
         author = self._author_entry.get_text().strip()
         desc = self._desc_entry.get_text().strip()
         if not rid:
-            self._show_error("Folder name (ID) is required.")
+            self._show_error("Repo name is required.")
             return
         if not name:
             name = rid
