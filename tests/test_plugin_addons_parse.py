@@ -74,10 +74,8 @@ def test_normalize_includes_upstream_section() -> None:
     by_sec = {r["upstream_section"]: r for r in rows}
     assert by_sec["01"]["name"].startswith("FreePIE")
     assert by_sec["01"]["download_url_32"].endswith("addon32")
-    assert by_sec["01"]["install_mode"] == "artifact"
     assert by_sec["02"]["download_url_32"] == ""
     assert by_sec["02"]["download_url_64"].endswith("frame_capture.addon")
-    assert by_sec["02"]["install_mode"] == "artifact"
 
 
 def test_skips_section_without_package_name() -> None:

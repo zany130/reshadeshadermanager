@@ -93,7 +93,7 @@ reshadeshadermanager/
 │   │   ├── reshade.py         # GitHub tags, download, zip extract, install/remove/check
 │   │   ├── repos.py           # BUILTIN_REPOS, user repos.json, merged_catalog
 │   │   ├── pcgw.py            # MediaWiki API, parse HTML → repo list, cache
-│   │   ├── git_sync.py        # clone/pull + lock; pull_existing_clones_for_catalog; plugin add-on clone/pull
+│   │   ├── git_sync.py        # clone/pull + lock; pull_existing_clones_for_catalog
 │   │   ├── ui_state.py        # window geometry JSON (no GTK)
 │   │   └── link_farm.py       # apply_shader_projection, enable/disable, layouts
 │   └── ui/
@@ -156,7 +156,6 @@ reshadeshadermanager/
 
 Aligned with [PROJECT_SPEC.md](PROJECT_SPEC.md) deferrals and non-goals:
 
-- **v0.2 plugin add-ons (design):** custom user add-ons are **repo-based by default** (global clone, pull on update, copy DLL from `dll_32_path` / `dll_64_path`, symlink companions from the clone); official `Addons.ini` entries may stay **artifact-based**. See **§ v0.2 Plugin add-ons (design target)** in [PROJECT_SPEC.md](PROJECT_SPEC.md).
 - **CLI** for scripting installs and shader projection.
 - **DirectX 8 x64 wrapper** if upstream ships a 64-bit `d3d8.dll` (today: 32-bit only).
 - **Multi-profile per game** (explicitly a non-goal for v0.1).

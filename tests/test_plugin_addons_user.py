@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 
 from reshade_shader_manager.core.paths import RsmPaths
-from reshade_shader_manager.core.plugin_addons_parse import assert_plugin_addon_row
 from reshade_shader_manager.core.plugin_addons_user import (
     load_user_plugin_addons,
     merged_plugin_addon_catalog,
@@ -105,34 +104,6 @@ def test_upsert_replaces_same_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     assert loaded[0]["download_url"] == "https://a/two"
 
 
-def test_upsert_repo_mode_without_download_urls(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
-    paths = RsmPaths.from_env()
-    paths.ensure_layout()
-    row = {
-        "id": "repo-addon",
-        "name": "Repo Addon",
-        "description": "",
-        "download_url_32": "",
-        "download_url_64": "",
-        "download_url": "",
-        "repository_url": "https://github.com/x/x.git",
-        "effect_install_path": "",
-        "upstream_section": "",
-        "source": "user",
-        "install_mode": "repo",
-        "dll_32_path": "x.addon32",
-        "dll_64_path": "x.addon64",
-        "shader_root": "",
-        "companion_shader_paths": "",
-    }
-    upsert_user_plugin_addon(paths, row)
-    loaded = load_user_plugin_addons(paths)
-    assert len(loaded) == 1
-    assert loaded[0]["install_mode"] == "repo"
-    assert loaded[0]["dll_64_path"] == "x.addon64"
-
-
 def test_upsert_requires_download_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
     paths = RsmPaths.from_env()
@@ -151,27 +122,3 @@ def test_upsert_requires_download_url(tmp_path: Path, monkeypatch: pytest.Monkey
     }
     with pytest.raises(ValueError, match="at least one download URL"):
         upsert_user_plugin_addon(paths, row)
-
-
-def test_repo_mode_requires_paths_and_repo_url() -> None:
-    base = {
-        "id": "r",
-        "name": "R",
-        "description": "",
-        "download_url_32": "",
-        "download_url_64": "",
-        "download_url": "",
-        "repository_url": "",
-        "effect_install_path": "",
-        "upstream_section": "",
-        "source": "user",
-        "install_mode": "repo",
-        "dll_32_path": "",
-        "dll_64_path": "",
-        "shader_root": "",
-        "companion_shader_paths": "",
-    }
-    with pytest.raises(ValueError, match="repository_url"):
-        assert_plugin_addon_row({**base, "dll_32_path": "a.addon32"})
-    with pytest.raises(ValueError, match="dll_32_path"):
-        assert_plugin_addon_row({**base, "repository_url": "https://github.com/a/a.git"})

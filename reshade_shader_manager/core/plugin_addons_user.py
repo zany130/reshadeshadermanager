@@ -35,20 +35,17 @@ def upsert_user_plugin_addon(paths: RsmPaths, row: dict[str, str]) -> None:
     """
     Replace or append a user ``plugin_addons.json`` row keyed by ``id``.
 
-    **Artifact** entries require at least one of ``download_url_32``, ``download_url_64``, or
-    ``download_url``. **Repo** entries (``install_mode`` ``repo``) require ``repository_url`` and
-    DLL paths per :func:`assert_plugin_addon_row` instead.
+    Requires at least one of ``download_url_32``, ``download_url_64``, or ``download_url``.
     """
     if row.get("source") != "user":
         raise ValueError("upsert_user_plugin_addon only accepts source=user rows")
     clean = assert_plugin_addon_row(row)
-    if clean["install_mode"] != "repo":
-        if not (
-            clean.get("download_url_32", "").strip()
-            or clean.get("download_url_64", "").strip()
-            or clean.get("download_url", "").strip()
-        ):
-            raise ValueError("Provide at least one download URL (32-bit, 64-bit, or single URL).")
+    if not (
+        clean.get("download_url_32", "").strip()
+        or clean.get("download_url_64", "").strip()
+        or clean.get("download_url", "").strip()
+    ):
+        raise ValueError("Provide at least one download URL (32-bit, 64-bit, or single URL).")
     user = load_user_plugin_addons(paths)
     rid = clean["id"]
     for i, e in enumerate(user):

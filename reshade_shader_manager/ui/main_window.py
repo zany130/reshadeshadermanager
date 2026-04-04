@@ -17,7 +17,7 @@ from reshade_shader_manager.core.manifest import (
     save_game_manifest,
 )
 from reshade_shader_manager.core.paths import get_paths
-from reshade_shader_manager.core.git_sync import pull_shader_and_plugin_addon_clones
+from reshade_shader_manager.core.git_sync import pull_existing_clones_for_catalog
 from reshade_shader_manager.core.pcgw import get_pcgw_repos
 from reshade_shader_manager.core.plugin_addons_catalog import get_upstream_plugin_addons
 from reshade_shader_manager.core.plugin_addons_user import merged_plugin_addon_catalog
@@ -25,7 +25,6 @@ from reshade_shader_manager.core.repos import merged_catalog
 from reshade_shader_manager.core.reshade import check_reshade, install_reshade, remove_reshade_binaries
 from reshade_shader_manager.core.targets import detect_game_arch
 from reshade_shader_manager.core.ui_state import WindowUiState, load_window_ui_state, save_window_ui_state
-from reshade_shader_manager.ui.add_plugin_addon_dialog import AddPluginAddonDialog
 from reshade_shader_manager.ui.add_repo_dialog import AddRepoDialog
 from reshade_shader_manager.ui.plugin_addon_dialog import PluginAddonWindow
 from reshade_shader_manager.ui.error_format import format_exception_for_ui
@@ -228,19 +227,12 @@ class MainWindow(Gtk.ApplicationWindow):
     def _build_plugin_addon_section(self) -> Gtk.Widget:
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         row.set_hexpand(True)
-        b_add = Gtk.Button(label="Add plugin add-on…")
-        b_add.set_tooltip_text(
-            "Save a download URL (and optional metadata) to ~/.config/…/plugin_addons.json. "
-            "Merged with the official Addons.ini list after refresh."
-        )
-        b_add.connect("clicked", self._on_add_plugin_addon)
         b = Gtk.Button(label="Manage plugin add-ons…")
         b.set_tooltip_text(
             "Copy official or user-listed ReShade plugin DLLs into the game folder "
             "(not the ReShade installer “addon” variant)."
         )
         b.connect("clicked", self._on_manage_plugin_addons)
-        row.append(b_add)
         row.append(b)
         return row
 
@@ -556,29 +548,22 @@ class MainWindow(Gtk.ApplicationWindow):
         self._run_worker(task, ok, err)
 
     def _on_update_local_clones(self, _btn: Gtk.Button) -> None:
-        if not self._catalog and not self._plugin_addon_catalog:
-            self._show_error(
-                "Refresh catalog first so RSM knows which shader repositories and plugin add-ons to update."
-            )
+        if not self._catalog:
+            self._show_error("Refresh catalog first so RSM knows which repositories to update.")
             return
 
         def task():
-            return pull_shader_and_plugin_addon_clones(
-                self._paths,
-                shader_catalog=self._catalog,
-                plugin_addon_catalog=self._plugin_addon_catalog,
-            )
+            return pull_existing_clones_for_catalog(self._paths, self._catalog)
 
         def ok(failures: list[str]) -> None:
             if failures:
                 self._show_error(
-                    "Some local clones failed to update:\n\n" + "\n".join(failures[:20])
+                    "Some repositories failed to update:\n\n" + "\n".join(failures[:20])
                     + ("\n…" if len(failures) > 20 else "")
                 )
             else:
                 self._show_info(
-                    "Local clones updated (git pull ran for each shader repo and repo-based plugin add-on "
-                    "that already had a clone)."
+                    "Local clones updated (git pull ran for each catalog repo that already had a clone)."
                 )
 
         def err(e: BaseException) -> None:
@@ -610,25 +595,6 @@ class MainWindow(Gtk.ApplicationWindow):
                 log.warning("Could not reload catalog: %s", e)
 
         win = AddRepoDialog(parent=self, paths=self._paths, on_saved=refresh_catalog)
-        win.present()
-
-    def _on_add_plugin_addon(self, _btn: Gtk.Button) -> None:
-        def refresh_catalog() -> None:
-            try:
-                up = get_upstream_plugin_addons(
-                    self._paths,
-                    ttl_hours=self._config.plugin_addons_catalog_ttl_hours,
-                    force_refresh=False,
-                )
-                self._plugin_addon_catalog = merged_plugin_addon_catalog(self._paths, up)
-                log.info(
-                    "Plugin add-on catalog reloaded after save (%d entries)",
-                    len(self._plugin_addon_catalog),
-                )
-            except Exception as e:  # noqa: BLE001
-                log.warning("Could not reload plugin add-on catalog: %s", e)
-
-        win = AddPluginAddonDialog(parent=self, paths=self._paths, on_saved=refresh_catalog)
         win.present()
 
     def _on_manage_shaders(self, _btn: Gtk.Button) -> None:

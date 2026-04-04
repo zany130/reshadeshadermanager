@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import re
@@ -14,7 +13,6 @@ import zipfile
 from pathlib import Path
 
 from reshade_shader_manager.core.exceptions import RSMError
-from reshade_shader_manager.core.git_sync import ensure_plugin_addon_clone
 from reshade_shader_manager.core.link_farm import _prune_empty_parents
 from reshade_shader_manager.core.link_farm import _SHADER_EXTS as _LF_SHADER_EXTS
 from reshade_shader_manager.core.link_farm import _TEXTURE_EXTS as _LF_TEXTURE_EXTS
@@ -26,16 +24,6 @@ log = logging.getLogger(__name__)
 
 USER_AGENT = "reshade-shader-manager/0.2 (plugin add-on install)"
 
-
-def _downloaded_file_looks_like_html(path: Path) -> bool:
-    try:
-        head = path.read_bytes()[:512]
-    except OSError:
-        return False
-    s = head.lstrip()
-    return s.startswith(b"<") or s[:200].lower().find(b"<html") >= 0
-
-
 # Companion files in add-on ZIPs (plus common extra shader extensions).
 _COMPANION_SHADER_EXTS = frozenset(_LF_SHADER_EXTS) | {".hlsl", ".hlsli"}
 _COMPANION_TEXTURE_EXTS = frozenset(_LF_TEXTURE_EXTS)
@@ -45,40 +33,6 @@ def _fs_slug_addon_id(addon_id: str) -> str:
     """Safe single path segment under ``reshade-shaders/.../addons/<segment>/``."""
     s = re.sub(r"[^a-z0-9_-]+", "_", addon_id.strip().lower())[:48].strip("_") or "addon"
     return s
-
-
-def _dll_relpath_for_arch(entry: dict[str, str], *, arch: str) -> str:
-    """Relative path within a repo clone to the add-on payload for ``arch`` (repo-mode rows)."""
-    name = entry.get("name", entry.get("id", "?"))
-    p32 = entry.get("dll_32_path", "").strip()
-    p64 = entry.get("dll_64_path", "").strip()
-    if arch == "64":
-        if p64:
-            return p64
-        raise RSMError(
-            f"Plugin add-on {name!r} (repo mode) has no dll_64_path for 64-bit games."
-        )
-    if p32:
-        return p32
-    raise RSMError(
-        f"Plugin add-on {name!r} (repo mode) has no dll_32_path for 32-bit games."
-    )
-
-
-def _parse_companion_shader_paths_list(raw: str) -> list[str]:
-    """Parse ``companion_shader_paths``: JSON array or comma-separated relative paths."""
-    s = raw.strip()
-    if not s:
-        return []
-    if s.startswith("["):
-        try:
-            data = json.loads(s)
-        except json.JSONDecodeError:
-            return []
-        if isinstance(data, list):
-            return [str(x).strip() for x in data if str(x).strip()]
-        return []
-    return [p.strip() for p in s.split(",") if p.strip()]
 
 
 def resolve_download_url_for_arch(entry: dict[str, str], *, arch: str) -> str:
@@ -127,19 +81,9 @@ def resolve_download_url_for_arch(entry: dict[str, str], *, arch: str) -> str:
 
 def installability_detail(entry: dict[str, str], *, arch: str) -> tuple[bool, str]:
     """
-    Return ``(True, \"\")`` if the row can be installed for ``arch``, else ``(False, reason)``.
-
-    **Artifact** rows need resolvable download URLs; **repo** rows need ``repository_url`` and a
-    DLL path for the architecture.
+    Return ``(True, \"\")`` if :func:`resolve_download_url_for_arch` succeeds, else ``(False, reason)``.
+    Used to filter catalog rows by game architecture.
     """
-    if entry.get("install_mode") == "repo":
-        if not entry.get("repository_url", "").strip():
-            return False, "Repo-based plugin add-on has no repository_url."
-        try:
-            _dll_relpath_for_arch(entry, arch=arch)
-        except RSMError as e:
-            return False, str(e)
-        return True, ""
     try:
         resolve_download_url_for_arch(entry, arch=arch)
         return True, ""
@@ -296,13 +240,7 @@ def prepare_payload_file(
         return payload.resolve(), er
     is64 = pe_machine_is_64bit(archive)
     if is64 is None:
-        hint = ""
-        if _downloaded_file_looks_like_html(archive):
-            hint = (
-                " The download looks like HTML, not a binary—often caused by a GitHub “blob” "
-                "link to the file page. Use a direct/raw URL (e.g. raw.githubusercontent.com/…/file.addon)."
-            )
-        raise RSMError(f"Downloaded file is not a valid PE image: {archive.name}.{hint}")
+        raise RSMError(f"Downloaded file is not a valid PE image: {archive.name}")
     if is64 != (arch == "64"):
         raise RSMError(
             f"Downloaded add-on is {'64' if is64 else '32'}-bit PE but the game target is {arch}-bit."
@@ -419,100 +357,6 @@ def _install_companion_symlinks_from_extract(
     return sorted(created)
 
 
-def _is_safe_path_under_root(path: Path, root: Path) -> bool:
-    try:
-        path.resolve().relative_to(root.resolve())
-    except ValueError:
-        return False
-    return True
-
-
-def _install_companion_symlinks_from_repo_clone(
-    game_dir: Path,
-    addon_id: str,
-    clone_root: Path,
-    entry: dict[str, str],
-    payload_path: Path,
-) -> list[str]:
-    """
-    Symlink companion shaders/textures from a **repo clone** into ``reshade-shaders/.../addons/<slug>/``.
-
-    Uses ``shader_root`` (walk) and/or ``companion_shader_paths`` (explicit relative paths).
-    """
-    gd = game_dir.resolve()
-    cr = clone_root.resolve()
-    try:
-        pay = payload_path.resolve()
-    except OSError:
-        pay = payload_path
-
-    slug = _fs_slug_addon_id(addon_id)
-    base = gd / "reshade-shaders"
-    sh_base = base / "Shaders" / "addons" / slug
-    tx_base = base / "Textures" / "addons" / slug
-
-    dst_to_src: dict[Path, Path] = {}
-
-    def consider_file(src: Path) -> None:
-        if not src.is_file():
-            return
-        if not _is_safe_path_under_root(src, cr):
-            return
-        try:
-            rel = src.resolve().relative_to(cr)
-        except ValueError:
-            return
-        if ".." in rel.parts:
-            return
-        if src.resolve() == pay:
-            return
-        if _is_non_companion_artifact(src):
-            return
-        dst = _companion_destination(rel, sh_base=sh_base, tx_base=tx_base)
-        if dst is None:
-            return
-        prev = dst_to_src.get(dst)
-        if prev is not None and prev != src:
-            raise RSMError(
-                f"Add-on {addon_id!r} maps two repo files to the same companion path {dst}."
-            )
-        dst_to_src[dst] = src
-
-    sr = entry.get("shader_root", "").strip()
-    if sr:
-        walk_root = (cr / sr).resolve()
-        if walk_root.is_dir() and _is_safe_path_under_root(walk_root, cr):
-            for dirpath, dirnames, filenames in os.walk(walk_root, topdown=True):
-                dirnames[:] = [d for d in dirnames if d != ".git"]
-                for fn in filenames:
-                    consider_file(Path(dirpath) / fn)
-
-    for rel_s in _parse_companion_shader_paths_list(entry.get("companion_shader_paths", "")):
-        rel_p = Path(rel_s)
-        if ".." in rel_p.parts:
-            continue
-        consider_file(cr / rel_p)
-
-    created: list[str] = []
-    for dst, src in sorted(dst_to_src.items(), key=lambda kv: str(kv[0]).lower()):
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        if dst.exists() and not dst.is_symlink():
-            raise RSMError(
-                f"Cannot install companion for add-on {addon_id!r}: {dst} exists and is not a symlink."
-            )
-        if dst.is_symlink():
-            try:
-                if dst.resolve() == src.resolve():
-                    created.append(os.path.abspath(dst))
-                    continue
-            except OSError:
-                pass
-            dst.unlink(missing_ok=True)
-        dst.symlink_to(src.resolve(), target_is_directory=False)
-        created.append(os.path.abspath(dst))
-    return sorted(created)
-
-
 def _tracked_root_basenames(manifest: GameManifest, *, exclude_addon_id: str | None = None) -> set[str]:
     s: set[str] = set()
     for aid, basenames in manifest.plugin_addon_root_copies.items():
@@ -594,12 +438,10 @@ def apply_plugin_addon_installation(
     """
     Reconcile on-disk plugin add-ons and manifest to match ``desired_plugin_addon_ids``.
 
-    **Artifact** rows: download by URL (ZIP or flat); companions from ZIP extract when present.
-
-    **Repo** rows (``install_mode`` ``repo``): ``git clone``/pull under ``plugin-addons/<id>/``,
-    copy ``dll_32_path`` / ``dll_64_path`` into ``game_dir``, symlink companions from the clone.
-
-    Root payloads are always copies (never symlinks). Fails on conflicts with unmanaged files.
+    Copies payloads into ``game_dir`` (never symlinks for root DLLs). For ZIP archives,
+    companion ``.fx`` / textures are symlinked under ``reshade-shaders/Shaders/addons/<id>/``
+    and ``.../Textures/addons/<id>/``. Fails on conflicts with unmanaged files or
+    ReShade-tracked DLLs. ZIP archives use fail-closed payload choice.
     """
     gd = game_dir.resolve()
     if not gd.is_dir():
@@ -624,30 +466,6 @@ def apply_plugin_addon_installation(
         if not entry:
             log.warning("Unknown plugin add-on id %r — skipped", aid)
             continue
-
-        if entry.get("install_mode") == "repo":
-            repo_url = entry.get("repository_url", "").strip()
-            if not repo_url:
-                raise RSMError(f"Plugin add-on {aid!r} has install_mode=repo but no repository_url.")
-            ensure_plugin_addon_clone(paths, aid, repo_url, pull=True)
-            clone_root = paths.plugin_addon_clone_dir(aid)
-            rel = _dll_relpath_for_arch(entry, arch=arch)
-            payload_src = (clone_root / rel).resolve()
-            if not payload_src.is_file():
-                raise RSMError(
-                    f"Repo add-on {aid!r}: missing payload file in clone (expected {rel!r} under {clone_root})."
-                )
-            _remove_addon_install(paths, manifest, gd, aid)
-            dest_basename = payload_src.name
-            _assert_install_conflict(gd, dest_basename, manifest, installing_addon_id=aid)
-            dest = gd / dest_basename
-            shutil.copy2(payload_src, dest)
-            manifest.plugin_addon_root_copies[aid] = [dest_basename]
-            manifest.plugin_addon_companion_symlinks[aid] = _install_companion_symlinks_from_repo_clone(
-                gd, aid, clone_root, entry, payload_src
-            )
-            continue
-
         try:
             url = resolve_download_url_for_arch(entry, arch=arch)
         except RSMError as e:

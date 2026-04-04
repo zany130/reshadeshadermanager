@@ -39,7 +39,6 @@ class RsmPaths:
             self.config_dir / "games",
             self.data_dir,
             self.data_dir / "repos",
-            self.data_dir / "plugin-addons",
             self.data_dir / "reshade" / "downloads",
             self.data_dir / "reshade" / "extracted",
             self.data_dir / "d3d8to9",
@@ -66,11 +65,6 @@ class RsmPaths:
 
     def repo_clone_dir(self, repo_id: str) -> Path:
         return self.data_dir / "repos" / repo_id
-
-    def plugin_addon_clone_dir(self, addon_id: str) -> Path:
-        """Global git clone root for a repo-based user plugin add-on (v0.2+)."""
-        safe_id = re.sub(r"[^a-z0-9_-]+", "_", addon_id.strip().lower())[:64].strip("_") or "addon"
-        return self.data_dir / "plugin-addons" / safe_id
 
     def reshade_download_path(self, version: str, *, addon: bool) -> Path:
         suffix = "_Addon" if addon else ""

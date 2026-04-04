@@ -101,7 +101,7 @@ class PluginAddonWindow(Gtk.Window):
                 row_box.append(cb)
                 src = row.get("source", "")
                 lbl = Gtk.Label(
-                    label=f"{row.get('name', rid)}  (add-on name: {rid}) — {src}",
+                    label=f"{row.get('name', rid)}  ({rid}) — {src}",
                     xalign=0.0,
                     hexpand=True,
                     wrap=True,

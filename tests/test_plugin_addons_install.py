@@ -128,49 +128,6 @@ def _entry(
     }
 
 
-def test_filter_catalog_installable_includes_repo_mode_when_paths() -> None:
-    repo = {
-        "id": "repo-only",
-        "name": "R",
-        "description": "",
-        "download_url_32": "",
-        "download_url_64": "",
-        "download_url": "",
-        "repository_url": "https://github.com/a/a.git",
-        "effect_install_path": "",
-        "upstream_section": "",
-        "source": "user",
-        "install_mode": "repo",
-        "dll_32_path": "a.addon32",
-        "dll_64_path": "a.addon64",
-        "shader_root": "",
-        "companion_shader_paths": "",
-    }
-    assert len(filter_catalog_installable_for_arch([repo], arch="64")) == 1
-    assert filter_catalog_installable_for_arch([repo], arch="32")[0]["id"] == "repo-only"
-
-
-def test_filter_repo_mode_missing_arch_dll_path() -> None:
-    repo = {
-        "id": "r",
-        "name": "R",
-        "description": "",
-        "download_url_32": "",
-        "download_url_64": "",
-        "download_url": "",
-        "repository_url": "https://github.com/a/a.git",
-        "effect_install_path": "",
-        "upstream_section": "",
-        "source": "user",
-        "install_mode": "repo",
-        "dll_32_path": "a.addon32",
-        "dll_64_path": "",
-        "shader_root": "",
-        "companion_shader_paths": "",
-    }
-    assert filter_catalog_installable_for_arch([repo], arch="64") == []
-
-
 def test_filter_catalog_installable_for_arch() -> None:
     both = _entry("both", u32="https://x/32", u64="https://x/64")
     sixtyfour_only = _entry("64only", u64="https://x/64only")
@@ -244,71 +201,6 @@ def test_apply_copies_raw_addon_with_mock_download(tmp_path: Path, monkeypatch: 
     assert m.plugin_addon_root_copies["a1"] == ["payload.addon32"]
     assert m.plugin_addon_companion_symlinks["a1"] == []
     assert m.enabled_plugin_addon_ids == ["a1"]
-
-
-def test_apply_repo_based_copies_from_clone(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
-    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
-    paths = RsmPaths.from_env()
-    paths.ensure_layout()
-    game = tmp_path / "game"
-    game.mkdir()
-    clone_root = tmp_path / "pa_clone"
-    clone_root.mkdir()
-    (clone_root / "x.addon64").write_bytes(b"payload64")
-
-    def fake_ensure(
-        _paths: RsmPaths,
-        addon_id: str,
-        _git_url: str,
-        *,
-        pull: bool = True,
-        timeout: float = 300.0,
-    ) -> None:
-        assert addon_id == "r1"
-
-    def fake_clone_dir(self: RsmPaths, addon_id: str) -> Path:
-        assert addon_id == "r1"
-        return clone_root
-
-    monkeypatch.setattr(
-        "reshade_shader_manager.core.plugin_addons_install.ensure_plugin_addon_clone",
-        fake_ensure,
-    )
-    monkeypatch.setattr(RsmPaths, "plugin_addon_clone_dir", fake_clone_dir)
-
-    m = new_game_manifest(game)
-    m.reshade_arch = "64"
-    cat = {
-        "r1": {
-            "id": "r1",
-            "name": "Repo",
-            "description": "",
-            "download_url_32": "",
-            "download_url_64": "",
-            "download_url": "",
-            "repository_url": "https://github.com/x/x.git",
-            "effect_install_path": "",
-            "upstream_section": "",
-            "source": "user",
-            "install_mode": "repo",
-            "dll_32_path": "",
-            "dll_64_path": "x.addon64",
-            "shader_root": "",
-            "companion_shader_paths": "",
-        }
-    }
-    apply_plugin_addon_installation(
-        paths=paths,
-        manifest=m,
-        game_dir=game,
-        desired_plugin_addon_ids={"r1"},
-        catalog_by_id=cat,
-    )
-    assert (game / "x.addon64").read_bytes() == b"payload64"
-    assert m.plugin_addon_root_copies["r1"] == ["x.addon64"]
-    assert m.enabled_plugin_addon_ids == ["r1"]
 
 
 def test_conflict_existing_unmanaged_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
