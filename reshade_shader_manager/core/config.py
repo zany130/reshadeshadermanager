@@ -17,12 +17,15 @@ class AppConfig:
     create_ini_if_missing: bool = True
     shader_download_enabled: bool = True
     pcgw_cache_ttl_hours: float = 24.0
+    plugin_addons_catalog_ttl_hours: float = 24.0
 
     def validate(self) -> None:
         if self.default_variant not in ("standard", "addon"):
             raise ValueError(f"invalid default_variant: {self.default_variant!r}")
         if self.pcgw_cache_ttl_hours < 0:
             raise ValueError("pcgw_cache_ttl_hours must be >= 0")
+        if self.plugin_addons_catalog_ttl_hours < 0:
+            raise ValueError("plugin_addons_catalog_ttl_hours must be >= 0")
 
     def to_json_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -39,6 +42,9 @@ class AppConfig:
             create_ini_if_missing=bool(m.get("create_ini_if_missing", AppConfig.create_ini_if_missing)),
             shader_download_enabled=bool(m.get("shader_download_enabled", AppConfig.shader_download_enabled)),
             pcgw_cache_ttl_hours=float(m.get("pcgw_cache_ttl_hours", AppConfig.pcgw_cache_ttl_hours)),
+            plugin_addons_catalog_ttl_hours=float(
+                m.get("plugin_addons_catalog_ttl_hours", AppConfig.plugin_addons_catalog_ttl_hours)
+            ),
         )
 
 
