@@ -14,7 +14,7 @@ GTK UI (v0.1) is a thin frontend over a metadata-driven backend core.
 - Select graphics API (`opengl`, `dx9`, `dx10`, `dx11`, `dx12`) and ReShade variant (`standard`/`addon`)
 - Install / remove ReShade binaries; **Update / Reinstall Latest** resolves current upstream `latest` (GitHub tags / cache) for the selected standard or addon variant and reinstalls
 - Check that installed ReShade binaries exist
-- Refresh shader catalog (built-in + user `repos.json` + cached PCGamingWiki)
+- Refresh shader catalog (built-in + user `repos.json` + cached PCGamingWiki); same action refreshes the **plugin add-on** list from official `Addons.ini` (cached) merged with optional `plugin_addons.json`
 - **Add repository…** to append a custom Git repo to `~/.config/.../repos.json`
 - **Update local clones** — `git pull` for catalog repos that already have a clone (Apply does not pull)
 - Manage shaders: enable/disable repos for the selected game (full symlink rebuild on Apply)
@@ -64,9 +64,9 @@ reshade-shader-manager
 
 Backend uses these defaults:
 
-- Config: `~/.config/reshade-shader-manager/config.json`, `repos.json`, and per-game manifests under `games/`
+- Config: `~/.config/reshade-shader-manager/config.json`, `repos.json`, optional `plugin_addons.json` (user-defined plugin add-ons), and per-game manifests under `games/`
 - Data: `~/.local/share/reshade-shader-manager/` (git clones and downloaded/extracted ReShade)
-- Cache: `~/.cache/reshade-shader-manager/pcgw_repos.json`
+- Cache: `~/.cache/reshade-shader-manager/pcgw_repos.json`, `plugin_addons_catalog.json` (parsed upstream `Addons.ini`)
 
 Per-game projection happens under:
 
