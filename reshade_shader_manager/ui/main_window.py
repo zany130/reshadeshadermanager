@@ -26,6 +26,7 @@ from reshade_shader_manager.core.reshade import check_reshade, install_reshade, 
 from reshade_shader_manager.core.targets import detect_game_arch
 from reshade_shader_manager.core.ui_state import WindowUiState, load_window_ui_state, save_window_ui_state
 from reshade_shader_manager.ui.add_repo_dialog import AddRepoDialog
+from reshade_shader_manager.ui.plugin_addon_dialog import PluginAddonWindow
 from reshade_shader_manager.ui.error_format import format_exception_for_ui
 from reshade_shader_manager.ui.log_view import LogPanel, setup_gui_logging
 from reshade_shader_manager.ui.shader_dialog import ShaderRepoWindow
@@ -88,6 +89,9 @@ class MainWindow(Gtk.ApplicationWindow):
 
         body.append(_section("Shader repositories"))
         body.append(self._build_shader_section())
+
+        body.append(_section("Plugin add-ons"))
+        body.append(self._build_plugin_addon_section())
 
         outer.append(body)
 
@@ -218,6 +222,18 @@ class MainWindow(Gtk.ApplicationWindow):
         row.append(b_pull)
         row.append(b_add)
         row.append(b_man)
+        return row
+
+    def _build_plugin_addon_section(self) -> Gtk.Widget:
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        row.set_hexpand(True)
+        b = Gtk.Button(label="Manage plugin add-ons…")
+        b.set_tooltip_text(
+            "Copy official or user-listed ReShade plugin DLLs into the game folder "
+            "(not the ReShade installer “addon” variant)."
+        )
+        b.connect("clicked", self._on_manage_plugin_addons)
+        row.append(b)
         return row
 
     def _on_close_request(self, *_args) -> bool:
@@ -595,5 +611,28 @@ class MainWindow(Gtk.ApplicationWindow):
             game_dir=self._game_dir,
             catalog=self._catalog,
             on_done=lambda: log.info("Shader dialog closed after apply."),
+        )
+        win.present()
+
+    def _on_manage_plugin_addons(self, _btn: Gtk.Button) -> None:
+        if not self._game_dir:
+            self._show_error("Select a game directory.")
+            return
+        if self._arch_value not in ("32", "64"):
+            self._show_error(
+                "Could not detect 32/64-bit architecture. Add a Windows .exe so add-on "
+                "downloads match the game."
+            )
+            return
+        if not self._plugin_addon_catalog:
+            self._show_error('Click “Refresh catalog” first (loads the plugin add-on list).')
+            return
+        win = PluginAddonWindow(
+            parent=self,
+            paths=self._paths,
+            game_dir=self._game_dir,
+            catalog=list(self._plugin_addon_catalog),
+            sync_manifest=self._sync_manifest_from_ui,
+            on_done=lambda: log.info("Plugin add-on dialog closed after apply."),
         )
         win.present()
