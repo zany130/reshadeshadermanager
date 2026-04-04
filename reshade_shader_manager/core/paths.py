@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -41,6 +42,7 @@ class RsmPaths:
             self.data_dir / "reshade" / "downloads",
             self.data_dir / "reshade" / "extracted",
             self.data_dir / "d3d8to9",
+            self.data_dir / "addons" / "downloads",
             self.data_dir / "logs",
             self.cache_dir,
         ):
@@ -81,6 +83,12 @@ class RsmPaths:
     def plugin_addons_json(self) -> Path:
         """User-defined plugin add-ons (not upstream ``Addons.ini``)."""
         return self.config_dir / "plugin_addons.json"
+
+    def plugin_addon_artifact_dir(self, addon_id: str, download_url: str) -> Path:
+        """Per-URL download/extract cache for a plugin add-on (under XDG data)."""
+        safe_id = re.sub(r"[^a-z0-9_-]+", "_", addon_id.strip().lower())[:48].strip("_") or "addon"
+        h = hashlib.sha256(download_url.encode("utf-8")).hexdigest()[:16]
+        return self.data_dir / "addons" / "downloads" / safe_id / h
 
     def reshade_latest_cache_path(self) -> Path:
         return self.cache_dir / "reshade_latest_cache.json"
