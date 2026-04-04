@@ -17,7 +17,7 @@ from reshade_shader_manager.core.manifest import (
     save_game_manifest,
 )
 from reshade_shader_manager.core.paths import get_paths
-from reshade_shader_manager.core.git_sync import pull_existing_clones_for_catalog
+from reshade_shader_manager.core.git_sync import pull_shader_and_plugin_addon_clones
 from reshade_shader_manager.core.pcgw import get_pcgw_repos
 from reshade_shader_manager.core.plugin_addons_catalog import get_upstream_plugin_addons
 from reshade_shader_manager.core.plugin_addons_user import merged_plugin_addon_catalog
@@ -556,22 +556,29 @@ class MainWindow(Gtk.ApplicationWindow):
         self._run_worker(task, ok, err)
 
     def _on_update_local_clones(self, _btn: Gtk.Button) -> None:
-        if not self._catalog:
-            self._show_error("Refresh catalog first so RSM knows which repositories to update.")
+        if not self._catalog and not self._plugin_addon_catalog:
+            self._show_error(
+                "Refresh catalog first so RSM knows which shader repositories and plugin add-ons to update."
+            )
             return
 
         def task():
-            return pull_existing_clones_for_catalog(self._paths, self._catalog)
+            return pull_shader_and_plugin_addon_clones(
+                self._paths,
+                shader_catalog=self._catalog,
+                plugin_addon_catalog=self._plugin_addon_catalog,
+            )
 
         def ok(failures: list[str]) -> None:
             if failures:
                 self._show_error(
-                    "Some repositories failed to update:\n\n" + "\n".join(failures[:20])
+                    "Some local clones failed to update:\n\n" + "\n".join(failures[:20])
                     + ("\n…" if len(failures) > 20 else "")
                 )
             else:
                 self._show_info(
-                    "Local clones updated (git pull ran for each catalog repo that already had a clone)."
+                    "Local clones updated (git pull ran for each shader repo and repo-based plugin add-on "
+                    "that already had a clone)."
                 )
 
         def err(e: BaseException) -> None:

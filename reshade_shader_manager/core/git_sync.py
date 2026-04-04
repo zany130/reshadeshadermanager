@@ -123,3 +123,28 @@ def pull_existing_plugin_addon_clones(
         except Exception as e:  # noqa: BLE001
             failures.append(f"{aid}: {e}")
     return failures
+
+
+def pull_shader_and_plugin_addon_clones(
+    paths: RsmPaths,
+    *,
+    shader_catalog: list[dict[str, str]] | None,
+    plugin_addon_catalog: list[dict[str, str]] | None,
+    timeout: float = 300.0,
+) -> list[str]:
+    """
+    Run :func:`pull_existing_clones_for_catalog` and
+    :func:`pull_existing_plugin_addon_clones` when the corresponding catalog is non-empty.
+
+    Returns concatenated failure lines (shader repos first, then plugin add-ons).
+    """
+    failures: list[str] = []
+    if shader_catalog:
+        failures.extend(
+            pull_existing_clones_for_catalog(paths, shader_catalog, timeout=timeout)
+        )
+    if plugin_addon_catalog:
+        failures.extend(
+            pull_existing_plugin_addon_clones(paths, plugin_addon_catalog, timeout=timeout)
+        )
+    return failures
