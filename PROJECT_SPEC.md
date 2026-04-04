@@ -402,6 +402,59 @@ Deferred
 
 ---
 
+## v0.2 Plugin add-ons (design target)
+
+This section updates the **intended** model for plugin add-ons (ReShade *plugin* DLLs and optional companion effect files—not the ReShade installer “addon” variant). Implementation may lag; treat this as the rule set to converge on.
+
+### Two-tier model
+
+| Source | Default mechanism | Rationale |
+|--------|-------------------|-----------|
+| **Official upstream** (from cached `Addons.ini`) | **Artifact-based** | Upstream publishes download URLs and sometimes ZIPs; cloning every upstream project is unnecessary. RSM may continue to download artifacts, extract ZIPs, and (when present in the archive) install companion files from the extracted tree. |
+| **Custom user add-ons** (user catalog entry) | **Repo-based by default** | Matches shader repos: one global clone per id, explicit paths inside the tree, no reliance on ad-hoc raw file URLs for DLLs. Companion `.fx` / textures live next to binaries in the same repo. |
+
+User-added entries should **not** require hand-crafted GitHub “raw” URLs for DLLs when a git repository exists; the **clone** is the source of truth.
+
+### Repo-based custom add-ons (normative shape)
+
+Conceptually aligned with shader repositories:
+
+- **Global cache:** clone `repository_url` under the RSM data directory (same spirit as `repos/<repo-id>/`, with a **distinct** namespace such as `plugin-addons/<addon-id>/` to avoid conflating shader repos with plugin add-on repos).
+- **Refresh / update:** the same user workflows that update shader clones (e.g. “Update local clones” or equivalent) should **pull** existing plugin add-on clones so companion files and DLLs stay current without re-entering URLs.
+- **Game root:** copy (not symlink) the **selected** add-on DLL for the game architecture from paths **relative to the clone root** (see metadata below).
+- **Shader tree:** symlink optional companion shaders **from the clone** into the game’s `reshade-shaders/` tree (e.g. under `Shaders/addons/<addon-id>/…`), preserving filenames and using metadata to define which subtree(s) participate—consistent with “global source + per-game projection.”
+
+### Metadata (repo-based custom entries)
+
+Planned fields (names are indicative; exact JSON keys may be finalized in implementation):
+
+- **`repository_url`** — Git URL to clone (HTTPS). Required for repo-based custom add-ons.
+- **`dll_32_path`** — Path **relative to repository root** to the 32-bit plugin payload (e.g. `AutoHDR32.addon` or `build/Release/foo.addon32`).
+- **`dll_64_path`** — Same for 64-bit (e.g. `AutoHDR64.addon`).
+- **Optional shader / companion layout** — One or more of:
+  - **`shader_root`** — Directory relative to repo root whose contents (or subtree) are projected into the game shader tree; and/or
+  - **`companion_shader_paths`** / explicit list of relative file paths; and/or
+  - convention-only mode (e.g. fixed subdirs like `Shaders/` under the clone) documented at implementation time.
+
+Exact rules for “which files are companions” vs “payload DLL only” should follow the same clarity as shader `link_farm` (documented, fail-closed where ambiguous).
+
+### Official upstream (artifact-based)
+
+Entries originating from `Addons.ini` may continue to use **download URLs** (per-arch or single), ZIP or flat files, and **optional** companions discovered **only from downloaded artifacts** (e.g. contents of a release ZIP). No git clone is required for this tier.
+
+### Consistency and UX
+
+- **Consistency:** Plugin add-on **custom** flows should feel like shader repos: catalog entry → clone in data dir → update pulls → apply projects into the game.
+- **URLs:** Raw per-file GitHub URLs become **optional** for custom add-ons when a repo is specified; they are not the primary configuration path.
+- **Coexistence:** The merged catalog may contain both artifact-style upstream rows and repo-style user rows; apply logic selects behavior by entry type (e.g. `source` + discriminator such as `install_mode: artifact|repo`).
+
+### Non-goals for this design note
+
+- This section does not prescribe file-level implementation (modules, manifest field names in JSON on disk). Those belong in `IMPLEMENTATION_PLAN.md` / code once built.
+- Backward compatibility with older `plugin_addons.json` artifact-only rows is an implementation detail (deprecate, migrate, or support side-by-side).
+
+---
+
 🐶 Final Concept
 
 This project captures STL’s most powerful idea:
