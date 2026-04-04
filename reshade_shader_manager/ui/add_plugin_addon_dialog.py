@@ -47,15 +47,16 @@ class AddPluginAddonDialog(Gtk.Window):
         self._id_entry = Gtk.Entry()
         self._id_entry.set_placeholder_text("e.g. my-addon")
         self._id_entry.set_tooltip_text(
-            "Stable id for this add-on (lowercase letters, digits, dashes, underscores). "
-            "If this id already exists in your plugin_addons.json, the saved entry is replaced. "
-            "A user entry with the same id as an upstream Addons.ini row overrides the upstream row."
+            "Short catalog name for this add-on (lowercase letters, digits, dashes, underscores). "
+            "If this name already exists in your plugin_addons.json, the saved entry is replaced. "
+            "A user entry with the same name as an upstream Addons.ini row overrides the upstream row."
         )
-        row(0, "Add-on id", self._id_entry)
+        row(0, "Add-on name", self._id_entry)
 
         self._name_entry = Gtk.Entry()
         self._name_entry.set_placeholder_text("e.g. My custom add-on")
-        row(1, "Name", self._name_entry)
+        self._name_entry.set_tooltip_text("Optional label shown in the Manage plugin add-ons list.")
+        row(1, "Friendly name", self._name_entry)
 
         self._desc_entry = Gtk.Entry()
         self._desc_entry.set_placeholder_text("(optional)")
@@ -119,7 +120,7 @@ class AddPluginAddonDialog(Gtk.Window):
         u1 = self._u1_entry.get_text().strip()
         repo = self._repo_entry.get_text().strip()
         if not rid:
-            self._show_error("Add-on id is required.")
+            self._show_error("Add-on name is required.")
             return
         if not name:
             name = rid
