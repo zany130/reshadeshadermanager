@@ -44,7 +44,7 @@ Downstream maintainers can vendor this repo and depend on:
 
 Ensure the console script `reshade-shader-manager` is on `PATH`.
 
-## AppImage (optional, v0.1)
+## AppImage (optional)
 
 From the repository root on a **Fedora-like** build machine with `gtk4`, `python3-gobject`, and network access (first run downloads `appimagetool`):
 
@@ -52,7 +52,7 @@ From the repository root on a **Fedora-like** build machine with `gtk4`, `python
 ./packaging/appimage/build_appimage.sh
 ```
 
-This runs PyInstaller (onedir) and produces `packaging/appimage/reshade-shader-manager-0.1-x86_64.AppImage` (override version with `RSM_APPIMAGE_VERSION`). The bundle is compressed to roughly tens of megabytes; the unpacked tree is much larger because PyInstaller’s GObject/GTK hooks collect typelibs and related data. **GTK 4 is still expected on the host** at runtime.
+This runs PyInstaller (onedir) and produces `packaging/appimage/reshade-shader-manager-0.2.0-x86_64.AppImage` by default (override with `RSM_APPIMAGE_VERSION`). The bundle is compressed to roughly tens of megabytes; the unpacked tree is much larger because PyInstaller’s GObject/GTK hooks collect typelibs and related data. **GTK 4 is still expected on the host** at runtime.
 
 `packaging/appimage/AppDir/`, `packaging/appimage/tools/`, and `*.AppImage` outputs are gitignored; only the scripts, spec, desktop entry, and icon in `packaging/appimage/` are source-controlled.
 
