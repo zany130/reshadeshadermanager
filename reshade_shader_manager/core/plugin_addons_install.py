@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import re
 import shutil
 import urllib.error
 import urllib.parse
@@ -11,6 +13,9 @@ import zipfile
 from pathlib import Path
 
 from reshade_shader_manager.core.exceptions import RSMError
+from reshade_shader_manager.core.link_farm import _prune_empty_parents
+from reshade_shader_manager.core.link_farm import _SHADER_EXTS as _LF_SHADER_EXTS
+from reshade_shader_manager.core.link_farm import _TEXTURE_EXTS as _LF_TEXTURE_EXTS
 from reshade_shader_manager.core.manifest import GameManifest, save_game_manifest
 from reshade_shader_manager.core.paths import RsmPaths
 from reshade_shader_manager.core.targets import pe_machine_is_64bit
@@ -18,6 +23,16 @@ from reshade_shader_manager.core.targets import pe_machine_is_64bit
 log = logging.getLogger(__name__)
 
 USER_AGENT = "reshade-shader-manager/0.2 (plugin add-on install)"
+
+# Companion files in add-on ZIPs (plus common extra shader extensions).
+_COMPANION_SHADER_EXTS = frozenset(_LF_SHADER_EXTS) | {".hlsl", ".hlsli"}
+_COMPANION_TEXTURE_EXTS = frozenset(_LF_TEXTURE_EXTS)
+
+
+def _fs_slug_addon_id(addon_id: str) -> str:
+    """Safe single path segment under ``reshade-shaders/.../addons/<segment>/``."""
+    s = re.sub(r"[^a-z0-9_-]+", "_", addon_id.strip().lower())[:48].strip("_") or "addon"
+    return s
 
 
 def resolve_download_url_for_arch(entry: dict[str, str], *, arch: str) -> str:
@@ -208,14 +223,21 @@ def prepare_payload_file(
     url: str,
     *,
     arch: str,
-) -> Path:
-    """Download if needed; return path to a single DLL/addon file to copy into the game root."""
+) -> tuple[Path, Path | None]:
+    """
+    Download if needed.
+
+    Returns ``(payload_path, extract_root)``. For ZIP archives ``extract_root`` is the
+    extracted tree (for companion shaders/textures); for a flat download it is ``None``.
+    """
     archive, extract_root = download_artifact(paths, addon_id, url)
     if zipfile.is_zipfile(archive):
         if extract_root.is_dir():
             shutil.rmtree(extract_root, ignore_errors=True)
         _safe_extract_zip(archive, extract_root)
-        return pick_payload_from_zip_extract(extract_root, arch=arch)
+        er = extract_root.resolve()
+        payload = pick_payload_from_zip_extract(er, arch=arch)
+        return payload.resolve(), er
     is64 = pe_machine_is_64bit(archive)
     if is64 is None:
         raise RSMError(f"Downloaded file is not a valid PE image: {archive.name}")
@@ -223,7 +245,116 @@ def prepare_payload_file(
         raise RSMError(
             f"Downloaded add-on is {'64' if is64 else '32'}-bit PE but the game target is {arch}-bit."
         )
-    return archive
+    return archive.resolve(), None
+
+
+def _is_non_companion_artifact(path: Path) -> bool:
+    low = path.name.lower()
+    if low.endswith((".addon32", ".addon64")):
+        return True
+    if low.endswith(".addon") and not low.endswith((".addon32", ".addon64")):
+        return True
+    if path.suffix.lower() == ".dll":
+        return True
+    return False
+
+
+def _companion_destination(
+    rel: Path,
+    *,
+    sh_base: Path,
+    tx_base: Path,
+) -> Path | None:
+    """Map a path inside the add-on archive to a destination under ``reshade-shaders``."""
+    parts = rel.parts
+    if not parts:
+        return None
+    if ".." in parts:
+        return None
+    suf = rel.suffix.lower()
+    if parts[0].lower() == "shaders" and len(parts) > 1:
+        inner = Path(*parts[1:])
+        if inner.suffix.lower() in _COMPANION_SHADER_EXTS:
+            return sh_base / inner
+        return None
+    if parts[0].lower() == "textures" and len(parts) > 1:
+        inner = Path(*parts[1:])
+        if inner.suffix.lower() in _COMPANION_TEXTURE_EXTS:
+            return tx_base / inner
+        return None
+    if suf in _COMPANION_SHADER_EXTS:
+        return sh_base / rel
+    if suf in _COMPANION_TEXTURE_EXTS:
+        return tx_base / rel
+    return None
+
+
+def _install_companion_symlinks_from_extract(
+    game_dir: Path,
+    addon_id: str,
+    extract_root: Path,
+    payload_path: Path,
+) -> list[str]:
+    """
+    Symlink non-payload shader/texture files from ``extract_root`` into
+    ``reshade-shaders/Shaders/addons/<slug>/`` and ``.../Textures/addons/<slug>/``.
+
+    Returns absolute paths of created symlinks (for the manifest).
+    """
+    gd = game_dir.resolve()
+    er = extract_root.resolve()
+    try:
+        pay = payload_path.resolve()
+    except OSError:
+        pay = payload_path
+
+    slug = _fs_slug_addon_id(addon_id)
+    base = gd / "reshade-shaders"
+    sh_base = base / "Shaders" / "addons" / slug
+    tx_base = base / "Textures" / "addons" / slug
+
+    dst_to_src: dict[Path, Path] = {}
+    for dirpath, dirnames, filenames in os.walk(er, topdown=True):
+        dirnames[:] = [d for d in dirnames if d != ".git"]
+        for fn in filenames:
+            src = Path(dirpath) / fn
+            try:
+                rel = src.relative_to(er)
+            except ValueError:
+                continue
+            if src == pay or (src.is_file() and pay.is_file() and src.resolve() == pay):
+                continue
+            if _is_non_companion_artifact(src):
+                continue
+            dst = _companion_destination(rel, sh_base=sh_base, tx_base=tx_base)
+            if dst is None:
+                continue
+            prev = dst_to_src.get(dst)
+            if prev is not None and prev != src:
+                raise RSMError(
+                    f"Add-on {addon_id!r} maps two archive files to the same companion path {dst}."
+                )
+            dst_to_src[dst] = src
+
+    created: list[str] = []
+    for dst, src in sorted(dst_to_src.items(), key=lambda kv: str(kv[0]).lower()):
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if dst.exists() and not dst.is_symlink():
+            raise RSMError(
+                f"Cannot install companion for add-on {addon_id!r}: {dst} exists and is not a symlink."
+            )
+        if dst.is_symlink():
+            try:
+                if dst.resolve() == src.resolve():
+                    created.append(os.path.abspath(dst))
+                    continue
+            except OSError:
+                pass
+            dst.unlink(missing_ok=True)
+        dst.symlink_to(src.resolve(), target_is_directory=False)
+        # Record symlink location without resolving the link (resolve() would follow to cache).
+        created.append(os.path.abspath(dst))
+    return sorted(created)
 
 
 def _tracked_root_basenames(manifest: GameManifest, *, exclude_addon_id: str | None = None) -> set[str]:
@@ -282,13 +413,16 @@ def _remove_addon_install(paths: RsmPaths, manifest: GameManifest, game_dir: Pat
                 p.unlink()
         except OSError as e:
             log.warning("Could not remove %s: %s", p, e)
-    for abs_s in list(manifest.plugin_addon_companion_symlinks.get(addon_id, [])):
+    companion_paths = list(manifest.plugin_addon_companion_symlinks.get(addon_id, []))
+    for abs_s in companion_paths:
         p = Path(abs_s)
         try:
             if p.is_symlink():
                 p.unlink(missing_ok=True)
         except OSError as e:
             log.warning("Could not remove companion symlink %s: %s", p, e)
+    for abs_s in companion_paths:
+        _prune_empty_parents(Path(abs_s), gd)
     manifest.plugin_addon_root_copies.pop(addon_id, None)
     manifest.plugin_addon_companion_symlinks.pop(addon_id, None)
 
@@ -304,8 +438,10 @@ def apply_plugin_addon_installation(
     """
     Reconcile on-disk plugin add-ons and manifest to match ``desired_plugin_addon_ids``.
 
-    Copies payloads into ``game_dir`` (never symlinks for root DLLs). Fails on conflicts
-    with unmanaged files or ReShade-tracked DLLs. ZIP archives use fail-closed payload choice.
+    Copies payloads into ``game_dir`` (never symlinks for root DLLs). For ZIP archives,
+    companion ``.fx`` / textures are symlinked under ``reshade-shaders/Shaders/addons/<id>/``
+    and ``.../Textures/addons/<id>/``. Fails on conflicts with unmanaged files or
+    ReShade-tracked DLLs. ZIP archives use fail-closed payload choice.
     """
     gd = game_dir.resolve()
     if not gd.is_dir():
@@ -338,14 +474,19 @@ def apply_plugin_addon_installation(
 
         _remove_addon_install(paths, manifest, gd, aid)
 
-        payload = prepare_payload_file(paths, aid, url, arch=arch)
+        payload, extract_root = prepare_payload_file(paths, aid, url, arch=arch)
         dest_basename = payload.name
         _assert_install_conflict(gd, dest_basename, manifest, installing_addon_id=aid)
 
         dest = gd / dest_basename
         shutil.copy2(payload, dest)
         manifest.plugin_addon_root_copies[aid] = [dest_basename]
-        manifest.plugin_addon_companion_symlinks.setdefault(aid, [])
+        if extract_root is not None:
+            manifest.plugin_addon_companion_symlinks[aid] = _install_companion_symlinks_from_extract(
+                gd, aid, extract_root, payload
+            )
+        else:
+            manifest.plugin_addon_companion_symlinks[aid] = []
 
     manifest.enabled_plugin_addon_ids = sorted(manifest.plugin_addon_root_copies.keys())
     save_game_manifest(paths, manifest)

@@ -1,6 +1,7 @@
 """Plugin add-on install: ZIP picker, apply, conflicts."""
 
 import io
+import os
 import zipfile
 from pathlib import Path
 from unittest.mock import patch
@@ -184,7 +185,7 @@ def test_apply_copies_raw_addon_with_mock_download(tmp_path: Path, monkeypatch: 
     }
 
     def fake_prepare(*_a, **_k):
-        return payload
+        return payload, None
 
     with patch("reshade_shader_manager.core.plugin_addons_install.prepare_payload_file", side_effect=fake_prepare):
         apply_plugin_addon_installation(
@@ -198,6 +199,7 @@ def test_apply_copies_raw_addon_with_mock_download(tmp_path: Path, monkeypatch: 
     assert (game / "payload.addon32").is_file()
     assert (game / "payload.addon32").read_bytes() == b"fake-addon"
     assert m.plugin_addon_root_copies["a1"] == ["payload.addon32"]
+    assert m.plugin_addon_companion_symlinks["a1"] == []
     assert m.enabled_plugin_addon_ids == ["a1"]
 
 
@@ -230,7 +232,7 @@ def test_conflict_existing_unmanaged_file(tmp_path: Path, monkeypatch: pytest.Mo
     }
 
     def fake_prepare(*_a, **_k):
-        return payload
+        return payload, None
 
     with (
         patch("reshade_shader_manager.core.plugin_addons_install.prepare_payload_file", side_effect=fake_prepare),
@@ -260,5 +262,108 @@ def test_zip_roundtrip_prepare(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     cache_dir.mkdir(parents=True, exist_ok=True)
     (cache_dir / "blob.zip").write_bytes(zip_bytes)
 
-    p = prepare_payload_file(paths, addon_id, url, arch="64")
+    p, ex_root = prepare_payload_file(paths, addon_id, url, arch="64")
     assert p.name == "x.addon64"
+    assert ex_root is not None
+    assert (ex_root / "nested" / "x.addon64").is_file()
+
+
+def test_apply_zip_creates_companion_symlinks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    paths = RsmPaths.from_env()
+    paths.ensure_layout()
+    game = tmp_path / "game"
+    game.mkdir()
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("nested/x.addon64", b"fake64")
+        zf.writestr("Shaders/companion.fx", b"// fx\n")
+    zip_bytes = buf.getvalue()
+    addon_id = "myaddon"
+    url = "https://example.com/blob.zip"
+    cache_dir = paths.plugin_addon_artifact_dir(addon_id, url)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    (cache_dir / "blob.zip").write_bytes(zip_bytes)
+
+    m = new_game_manifest(game)
+    m.reshade_arch = "64"
+    cat = {
+        "myaddon": {
+            "id": "myaddon",
+            "name": "Test",
+            "description": "",
+            "download_url_32": "",
+            "download_url_64": "https://example.com/blob.zip",
+            "download_url": "",
+            "repository_url": "",
+            "effect_install_path": "",
+            "upstream_section": "",
+            "source": "upstream",
+        }
+    }
+    apply_plugin_addon_installation(
+        paths=paths,
+        manifest=m,
+        game_dir=game,
+        desired_plugin_addon_ids={"myaddon"},
+        catalog_by_id=cat,
+    )
+    link = game / "reshade-shaders" / "Shaders" / "addons" / "myaddon" / "companion.fx"
+    assert link.is_symlink()
+    assert m.plugin_addon_root_copies["myaddon"] == ["x.addon64"]
+    assert os.path.abspath(link) in m.plugin_addon_companion_symlinks["myaddon"]
+
+
+def test_remove_addon_drops_companion_symlinks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    paths = RsmPaths.from_env()
+    paths.ensure_layout()
+    game = tmp_path / "game"
+    game.mkdir()
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("nested/x.addon64", b"fake64")
+        zf.writestr("Shaders/companion.fx", b"// fx\n")
+    cache_dir = paths.plugin_addon_artifact_dir("myaddon", "https://example.com/blob.zip")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    (cache_dir / "blob.zip").write_bytes(buf.getvalue())
+
+    m = new_game_manifest(game)
+    m.reshade_arch = "64"
+    cat = {
+        "myaddon": {
+            "id": "myaddon",
+            "name": "Test",
+            "description": "",
+            "download_url_32": "",
+            "download_url_64": "https://example.com/blob.zip",
+            "download_url": "",
+            "repository_url": "",
+            "effect_install_path": "",
+            "upstream_section": "",
+            "source": "upstream",
+        }
+    }
+    apply_plugin_addon_installation(
+        paths=paths,
+        manifest=m,
+        game_dir=game,
+        desired_plugin_addon_ids={"myaddon"},
+        catalog_by_id=cat,
+    )
+    link = game / "reshade-shaders" / "Shaders" / "addons" / "myaddon" / "companion.fx"
+    assert link.is_symlink()
+
+    apply_plugin_addon_installation(
+        paths=paths,
+        manifest=m,
+        game_dir=game,
+        desired_plugin_addon_ids=set(),
+        catalog_by_id=cat,
+    )
+    assert not link.exists()
+    assert m.plugin_addon_companion_symlinks == {}
