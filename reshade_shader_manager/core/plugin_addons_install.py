@@ -24,27 +24,6 @@ log = logging.getLogger(__name__)
 
 USER_AGENT = "reshade-shader-manager/0.2 (plugin add-on install)"
 
-# ``https://github.com/{owner}/{repo}/blob/{ref}/{path}`` serves HTML; use raw.githubusercontent.com.
-_GITHUB_BLOB_URL_RE = re.compile(
-    r"^https://(?:www\.)?github\.com/([^/]+)/([^/]+)/blob/([^/]+)/(.+)$"
-)
-
-
-def normalize_plugin_addon_download_url(url: str) -> str:
-    """
-    Rewrite GitHub ``/blob/`` links to raw file URLs so downloads are binaries, not HTML.
-
-    See https://github.com/user/repo/blob/main/foo.addon → raw.githubusercontent.com
-    """
-    u = url.strip()
-    m = _GITHUB_BLOB_URL_RE.match(u)
-    if not m:
-        return u
-    owner, repo, ref, path_in_repo = m.groups()
-    raw = f"https://raw.githubusercontent.com/{owner}/{repo}/{ref}/{path_in_repo}"
-    log.debug("Normalized GitHub blob URL to raw: %s -> %s", u, raw)
-    return raw
-
 
 def _downloaded_file_looks_like_html(path: Path) -> bool:
     try:
@@ -158,7 +137,6 @@ def _artifact_paths(cache_dir: Path, url: str) -> tuple[Path, Path]:
 
 def download_artifact(paths: RsmPaths, addon_id: str, url: str) -> tuple[Path, Path]:
     """Return ``(archive_path, extract_root)``; download if missing."""
-    url = normalize_plugin_addon_download_url(url)
     cache_dir = paths.plugin_addon_artifact_dir(addon_id, url)
     archive, extract_root = _artifact_paths(cache_dir, url)
     if not archive.is_file() or archive.stat().st_size == 0:
@@ -275,9 +253,8 @@ def prepare_payload_file(
         hint = ""
         if _downloaded_file_looks_like_html(archive):
             hint = (
-                " The download looks like HTML (often from a GitHub “blob” page). "
-                "Use a raw file URL, e.g. https://raw.githubusercontent.com/…/…/file.addon "
-                "or let RSM rewrite github.com/…/blob/… links automatically."
+                " The download looks like HTML, not a binary—often caused by a GitHub “blob” "
+                "link to the file page. Use a direct/raw URL (e.g. raw.githubusercontent.com/…/file.addon)."
             )
         raise RSMError(f"Downloaded file is not a valid PE image: {archive.name}.{hint}")
     if is64 != (arch == "64"):

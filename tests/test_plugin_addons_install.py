@@ -15,29 +15,10 @@ from reshade_shader_manager.core.plugin_addons_install import (
     apply_plugin_addon_installation,
     filter_catalog_installable_for_arch,
     installability_detail,
-    normalize_plugin_addon_download_url,
     pick_payload_from_zip_extract,
     prepare_payload_file,
     resolve_download_url_for_arch,
 )
-
-
-def test_normalize_github_blob_to_raw() -> None:
-    blob = "https://github.com/MajorPainTheCactus/AutoHDR-ReShade/blob/main/AutoHDR64.addon"
-    raw = "https://raw.githubusercontent.com/MajorPainTheCactus/AutoHDR-ReShade/main/AutoHDR64.addon"
-    assert normalize_plugin_addon_download_url(blob) == raw
-
-
-def test_normalize_github_blob_www() -> None:
-    blob = "https://www.github.com/foo/bar/blob/main/x.addon"
-    assert normalize_plugin_addon_download_url(blob) == (
-        "https://raw.githubusercontent.com/foo/bar/main/x.addon"
-    )
-
-
-def test_normalize_non_github_unchanged() -> None:
-    u = "https://example.com/x.addon64"
-    assert normalize_plugin_addon_download_url(u) == u
 
 
 def test_resolve_download_url_prefers_arch_specific() -> None:
