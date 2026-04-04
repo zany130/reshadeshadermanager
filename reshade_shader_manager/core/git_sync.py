@@ -75,3 +75,51 @@ def pull_existing_clones_for_catalog(
         except Exception as e:  # noqa: BLE001
             failures.append(f"{rid}: {e}")
     return failures
+
+
+def ensure_plugin_addon_clone(
+    paths: RsmPaths,
+    addon_id: str,
+    git_url: str,
+    *,
+    pull: bool = True,
+    timeout: float = 300.0,
+) -> None:
+    """
+    Clone or update the global git cache for a **repo-based** plugin add-on.
+
+    Uses :meth:`RsmPaths.plugin_addon_clone_dir` (``…/plugin-addons/<id>/``). Same
+    semantics as shader :func:`clone_or_pull` for ``repos/<id>/``.
+    """
+    d = paths.plugin_addon_clone_dir(addon_id)
+    clone_or_pull(d, git_url.strip(), pull=pull, timeout=timeout)
+
+
+def pull_existing_plugin_addon_clones(
+    paths: RsmPaths,
+    addon_catalog: list[dict[str, str]],
+    *,
+    timeout: float = 300.0,
+) -> list[str]:
+    """
+    For each **repo-mode** entry in ``addon_catalog``, if
+    ``plugin_addon_clone_dir(id)`` already has ``.git``, run ``git pull``.
+
+    Missing clones are skipped (no clone). Returns ``\"<id>: <message>\"`` for failures.
+    """
+    failures: list[str] = []
+    for r in addon_catalog:
+        if r.get("install_mode") != "repo":
+            continue
+        aid = (r.get("id") or "").strip()
+        url = (r.get("repository_url") or "").strip()
+        if not aid or not url:
+            continue
+        d = paths.plugin_addon_clone_dir(aid)
+        if not (d / ".git").exists():
+            continue
+        try:
+            clone_or_pull(d, url, pull=True, timeout=timeout)
+        except Exception as e:  # noqa: BLE001
+            failures.append(f"{aid}: {e}")
+    return failures
