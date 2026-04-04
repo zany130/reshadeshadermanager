@@ -376,6 +376,17 @@ Deferred
 
 ---
 
+## v0.2 (release)
+
+**Plugin add-ons (ReShade plugin DLLs, not the installer “addon” EXE):**
+
+- **Source:** Official **`Addons.ini`** only — `https://raw.githubusercontent.com/crosire/reshade-shaders/list/Addons.ini`, fetched and cached. RSM lists installable entries (with download URLs for the game architecture) under **Manage plugin add-ons…** and copies artifacts into the game directory; manifest tracks enabled add-ons and companion symlinks when present in downloaded archives.
+- **Non-goals for plugin add-ons:** No user-defined add-on catalog file, no merging custom entries with upstream, no git clone of add-on repositories. **`RepositoryUrl`** in `Addons.ini` remains metadata for stable ids / reference, not an install transport.
+
+v0.2 includes the GTK UI and core behavior described for v0.1 above, plus this plugin add-on flow. See [CHANGELOG.md](CHANGELOG.md).
+
+---
+
 🧭 Implementation Order
 
 1. Core foundation

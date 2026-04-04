@@ -6,9 +6,9 @@ Standalone Linux tool to manage:
 - Git-based shader repositories (clone/pull)
 - Per-game shader enable/disable via directory symlinks
 
-GTK UI (v0.1) is a thin frontend over a metadata-driven backend core.
+GTK UI (**v0.2**) is a thin frontend over a metadata-driven backend core.
 
-## Features (v0.1)
+## Features (v0.2)
 
 - Pick a game directory (+ optional `.exe` to detect 32/64-bit)
 - Select graphics API (`opengl`, `dx9`, `dx10`, `dx11`, `dx12`) and ReShade variant (`standard`/`addon`)
@@ -60,6 +60,7 @@ reshade-shader-manager
 4. Click **Install**, or use **Update / Reinstall Latest** anytime to pull the newest ReShade build for the selected API and variant (no background updater in RSM; ReShade notifies in-game when applicable).
 5. Click **Refresh catalog**. Use **Update local clones** if you want newer commits from Git before applying.
 6. **Manage shaders…** to enable/disable repos for that game, then **Apply** (recreates projection; does not run `git pull`).
+7. Optionally **Manage plugin add-ons…** to enable official add-ons from the cached **Addons.ini** list, then **Apply** (downloads by URL; does not pull git for add-ons).
 
 ## Data locations (XDG)
 
@@ -77,7 +78,7 @@ Per-game projection happens under:
 
 ## Notes / limitations
 
-- v0.1 supports one active ReShade install state per game directory (reinstall replaces the tracked proxy binaries list; no multi-runtime merging).
+- v0.2 supports one active ReShade install state per game directory (reinstall replaces the tracked proxy binaries list; no multi-runtime merging).
 - **DirectX 8** uses **d3d8to9** (`d3d8.dll`) plus ReShade as **`d3d9.dll`**. The pinned crosire release currently ships a **32-bit** `d3d8.dll` only; **64-bit games** get a clear error at install time.
 - “Remove ReShade” is binary-only: it deletes files tracked in `installed_reshade_files` and does **not** remove shader symlinks, enabled repo state, or `ReShade.ini` by default.
 
@@ -85,17 +86,18 @@ Per-game projection happens under:
 
 See [packaging/README.md](packaging/README.md) for pip, wheels, optional **AppImage** build steps, Flatpak notes, and distro hints.
 
-## Roadmap (not v0.1)
+## Roadmap (post–v0.2)
 
 - CLI for scripting
 - Multi-profile per game (currently a non-goal)
 
-Details: [CONTEXT.md](CONTEXT.md) and [PROJECT_SPEC.md](PROJECT_SPEC.md).
+Details: [CONTEXT.md](CONTEXT.md), [PROJECT_SPEC.md](PROJECT_SPEC.md), and [CHANGELOG.md](CHANGELOG.md).
 
 ## Development
 
 See:
 
+- `CHANGELOG.md`
 - `PROJECT_SPEC.md`
 - `IMPLEMENTATION_PLAN.md`
 - `CONTEXT.md`

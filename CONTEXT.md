@@ -32,7 +32,7 @@ It is **inspired by** SteamTinkerLaunch (STL) behavior only; it does **not** dep
 ### Data flow (conceptual)
 
 - **Single source of truth:** JSON metadata under `~/.config/.../games/<game-id>.json` (`GameManifest`), not marker files in the game tree.
-- **Filesystem** (DLLs, symlinks, `ReShade.ini`) is **derived** from manifest + user actions; repair/drift is informational only unless code explicitly rescans (minimal in v0.1).
+- **Filesystem** (DLLs, symlinks, `ReShade.ini`) is **derived** from manifest + user actions; repair/drift is informational only unless code explicitly rescans (minimal by design).
 
 ### XDG layout
 
@@ -56,10 +56,10 @@ It is **inspired by** SteamTinkerLaunch (STL) behavior only; it does **not** dep
 2. **`symlinks_by_repo_id`** — Map `repo_id → [absolute symlink paths]` for precise disable/remove.
 3. **Built-in repos in code** — `repos.BUILTIN_REPOS`; `repos.json` holds **user** entries only; PCGW merged at runtime from cache.
 4. **Remove ReShade** — Deletes **only** `installed_reshade_files`; does **not** remove shader symlinks, `enabled_repo_ids`, or `ReShade.ini` by default.
-5. **One active ReShade runtime per game (v0.1)** — On **install**, previously tracked DLLs are removed from disk before copying new ones; `installed_reshade_files` is **replaced** (no multi-runtime merge).
+5. **One active ReShade runtime per game** — On **install**, previously tracked DLLs are removed from disk before copying new ones; `installed_reshade_files` is **replaced** (no multi-runtime merge).
 6. **`latest` version** — Resolved from GitHub **tags** (`/repos/crosire/reshade/tags?per_page=100`), highest semver (not `releases/latest`, which 404’d). On failure, use `~/.cache/.../reshade_latest_cache.json`; else require explicit version.
 7. **DX8** — **d3d8to9** (`d3d8.dll`) + ReShade as `d3d9.dll`; cached under `data/d3d8to9/`. Upstream release is **32-bit PE only** — 64-bit arch → clear `RSMError` (no guess).
-8. **Git concurrency (v0.1)** — `threading.Lock` in `git_sync.py` (in-process only).
+8. **Git concurrency** — `threading.Lock` in `git_sync.py` (in-process only).
 9. **PyGObject** — Declared in `pyproject.toml`; many Fedora users install with `pip install --no-deps -e .` after `dnf install python3-gobject gtk4` to avoid building PyGObject/pycairo from pip.
 
 ### Plugin add-ons (official upstream only)
@@ -79,6 +79,7 @@ These are ReShade **plugin** DLLs (e.g. `.addon32` / `.addon64`), not the ReShad
 reshadeshadermanager/
 ├── CONTEXT.md                 # This file (AI/human handoff)
 ├── README.md                  # GitHub quickstart
+├── CHANGELOG.md               # Release notes (e.g. v0.2.0)
 ├── PROJECT_SPEC.md            # Product goals, non-goals, data examples
 ├── IMPLEMENTATION_PLAN.md     # Locked decisions + validation notes
 ├── pyproject.toml             # hatchling, deps, entry point, pytest
@@ -138,7 +139,8 @@ reshadeshadermanager/
 - **No flattening** shader repos; **no renaming** shader files.
 - **STL = reference only** — do not port shell/YAD patterns as architecture.
 - **Backend/UI split** — Keep core importable without GTK; avoid heavy logic in UI files.
-- **v0.1 scope** — Avoid scope creep (no CLI required yet per spec deferral). ReShade updates: use **Update / Reinstall Latest** in the UI or Install with version `latest`; no RSM background version notifier (ReShade itself warns in-game when newer builds exist).
+- **Release v0.2 (current)** — Ships official **Addons.ini**–only plugin add-ons (see § Plugin add-ons above), ReShade + shader flows, GTK UI as in [README.md](README.md). **Not** in scope: CLI, user-defined plugin add-on catalogs, multi-profile per game.
+- **Deferred (post–v0.2)** — CLI per [PROJECT_SPEC.md](PROJECT_SPEC.md); multi-profile per game remains a non-goal until explicitly planned. ReShade updates: use **Update / Reinstall Latest** or explicit version; no RSM background version notifier.
 
 ---
 
@@ -151,22 +153,24 @@ reshadeshadermanager/
 
 ---
 
-## Next steps (optional polish)
+## Next steps (optional polish, post–v0.2)
 
-1. **Hardening:** Empty ReShade extract, addon filename drift, duplicate INI keys in `[GENERAL]` (v0.1 only updates first occurrence).
+These are **not** required to ship v0.2; track for hardening and packaging follow-up.
+
+1. **Hardening:** Empty ReShade extract, addon filename drift, duplicate INI keys in `[GENERAL]` (current INI merge updates first occurrence only).
 2. **Tests:** Headless GTK smoke; HTTP-mocked test for full `fetch_latest_reshade_version_from_github` (parser-only tests exist).
 3. **Multi-instance:** Git lock is in-process only; document or add file locking if two RSM instances become a problem.
 4. **Flatpak:** Example manifest in [packaging/](packaging/); publish to Flathub when ready.
 
 ---
 
-## Future milestones (not v0.1)
+## Future milestones (post–v0.2)
 
 Aligned with [PROJECT_SPEC.md](PROJECT_SPEC.md) deferrals and non-goals:
 
 - **CLI** for scripting installs and shader projection.
 - **DirectX 8 x64 wrapper** if upstream ships a 64-bit `d3d8.dll` (today: 32-bit only).
-- **Multi-profile per game** (explicitly a non-goal for v0.1).
+- **Multi-profile per game** (explicitly a non-goal unless scope changes).
 
 ---
 
@@ -188,5 +192,6 @@ reshade-shader-manager
 
 1. `CONTEXT.md` (this file)
 2. `README.md`
-3. `PROJECT_SPEC.md`
-4. `IMPLEMENTATION_PLAN.md`
+3. `CHANGELOG.md`
+4. `PROJECT_SPEC.md`
+5. `IMPLEMENTATION_PLAN.md`

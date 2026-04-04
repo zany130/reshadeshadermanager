@@ -31,7 +31,7 @@ class GameManifest:
     enabled_repo_ids: list[str] = field(default_factory=list)
     installed_reshade_files: list[str] = field(default_factory=list)
     symlinks_by_repo_id: dict[str, list[str]] = field(default_factory=dict)
-    # Plugin add-ons (metadata only in v0.2 milestone 1; install logic comes later).
+    # Plugin add-ons: official Addons.ini catalog; install state (root copies + companion symlinks).
     enabled_plugin_addon_ids: list[str] = field(default_factory=list)
     plugin_addon_root_copies: dict[str, list[str]] = field(default_factory=dict)
     plugin_addon_companion_symlinks: dict[str, list[str]] = field(default_factory=dict)

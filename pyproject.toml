@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "reshade-shader-manager"
-version = "0.1.0"
+version = "0.2.0"
 description = "Standalone ReShade and shader-repo manager for Linux (GTK 4 UI)"
 readme = "PROJECT_SPEC.md"
 requires-python = ">=3.10"
@@ -31,6 +31,7 @@ include = [
     "IMPLEMENTATION_PLAN.md",
     "CONTEXT.md",
     "README.md",
+    "CHANGELOG.md",
 ]
 
 [tool.pytest.ini_options]
