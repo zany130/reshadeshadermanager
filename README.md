@@ -51,6 +51,22 @@ reshade-shader-manager
 # or: python3 -m reshade_shader_manager.main
 ```
 
+## Command-line interface (v0.5+)
+
+After `pip install --no-deps -e .`, the **`rsm`** command is available (no display required). It uses the same core as the GUI:
+
+```bash
+rsm --help
+rsm catalog refresh
+rsm shaders apply --game-dir /path/to/game --repo quint --git-pull
+rsm shaders update-clones
+rsm addons apply --game-dir /path/to/game --addon some-id
+rsm reshade install --game-dir /path/to/game --exe /path/to/game.exe --api dx11
+rsm game inspect --game-dir /path/to/game --json
+```
+
+See `rsm --help` and [CHANGELOG.md](CHANGELOG.md) for the full command set.
+
 ## Testing against a real game
 
 1. In the UI, click **Game directory…** and choose the game/prefix folder where the `.exe` is located.

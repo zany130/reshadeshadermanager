@@ -6,7 +6,7 @@
 
 ## What this project is
 
-**reshade-shader-manager (RSM)** is a standalone Linux application (Python backend + GTK 4 UI) that:
+**reshade-shader-manager (RSM)** is a standalone Linux application (Python backend + GTK 4 UI + optional **`rsm` CLI**, v0.5+) that:
 
 - Installs / removes / checks **ReShade** into a user-chosen game directory (Wine/Proton-oriented).
 - Manages **Git-based shader repositories** (clone/pull, catalog merge).
@@ -21,12 +21,15 @@ It is **inspired by** SteamTinkerLaunch (STL) behavior only; it does **not** dep
 ### Layers
 
 1. **Core (`reshade_shader_manager/core/`)**  
-   Filesystem, network, git, manifest I/O, ReShade download/extract/install, INI patching, PCGW fetch/parse, symlink projection. **No GTK imports.**
+   Filesystem, network, git, manifest I/O, ReShade download/extract/install, INI patching, PCGW fetch/parse, symlink projection, shared catalog fetch (`catalog_ops`), user-facing error strings (`error_format`). **No GTK imports.**
 
 2. **UI (`reshade_shader_manager/ui/`)**  
    Thin GTK 4 layer: `MainWindow`, `ShaderRepoWindow`, `LogPanel` + logging handler. Long work runs on **background threads**; UI updates via `GLib.idle_add`.
 
-3. **Entry (`reshade_shader_manager/main.py`)**  
+3. **CLI (`reshade_shader_manager/cli.py`)**  
+   `argparse` front-end over core only (no PyGObject). Console script **`rsm`**.
+
+4. **GTK entry (`reshade_shader_manager/main.py`)**  
    `gi.require_version("Gtk", "4.0")` then `Gtk.Application` → `MainWindow`.
 
 ### Data flow (conceptual)
@@ -79,7 +82,7 @@ These are ReShade **plugin** DLLs (e.g. `.addon32` / `.addon64`), not the ReShad
 reshadeshadermanager/
 ├── CONTEXT.md                 # This file (AI/human handoff)
 ├── README.md                  # GitHub quickstart
-├── CHANGELOG.md               # Release notes (e.g. v0.4.0)
+├── CHANGELOG.md               # Release notes (e.g. v0.5.0)
 ├── PROJECT_SPEC.md            # Product goals, non-goals, data examples
 ├── IMPLEMENTATION_PLAN.md     # Locked decisions + validation notes
 ├── pyproject.toml             # hatchling, deps, entry point, pytest
@@ -87,9 +90,12 @@ reshadeshadermanager/
 ├── reshade_shader_manager/
 │   ├── __init__.py
 │   ├── main.py                # GTK Application entry
+│   ├── cli.py                 # argparse CLI; console script rsm
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── exceptions.py      # RSMError, VersionResolutionError
+│   │   ├── error_format.py    # format_exception_for_ui (shared with CLI)
+│   │   ├── catalog_ops.py     # fetch_merged_catalogs (GUI + CLI)
 │   │   ├── paths.py           # XDG, manifest paths `{slug}-{fp8}.json` + legacy hash id
 │   │   ├── config.py          # config.json
 │   │   ├── manifest.py        # GameManifest, load/save games/*.json
@@ -109,7 +115,7 @@ reshadeshadermanager/
 │   └── ui/
 │       ├── __init__.py
 │       ├── log_view.py        # LogPanel, GtkLogHandler, setup_gui_logging
-│       ├── error_format.py    # user-facing exception strings
+│       ├── error_format.py    # re-exports core.error_format
 │       ├── main_window.py     # Target, Recent games, ReShade, shader buttons, workers
 │       ├── shader_dialog.py   # ShaderRepoWindow checklist + apply
 │       ├── plugin_addon_dialog.py  # Plugin add-on checklist + Apply (DLL copies)
@@ -125,11 +131,13 @@ reshadeshadermanager/
     ├── test_git_sync.py
     ├── test_repos.py
     ├── test_error_format.py
+    ├── test_cli.py
+    ├── test_catalog_ops.py
     ├── test_backend_flows.py  # Integration-style: fake zip, mock git, PCGW fixture
     └── fixtures/pcgw_sample.html
 ```
 
-**Console script:** `reshade-shader-manager` → `reshade_shader_manager.main:main`
+**Console scripts:** `reshade-shader-manager` → `reshade_shader_manager.main:main`; **`rsm`** → `reshade_shader_manager.cli:main`
 
 ---
 
@@ -140,10 +148,11 @@ reshadeshadermanager/
 - **No flattening** shader repos; **no renaming** shader files.
 - **STL = reference only** — do not port shell/YAD patterns as architecture.
 - **Backend/UI split** — Keep core importable without GTK; avoid heavy logic in UI files.
-- **Release v0.4 (current)** — **Recent games** in the Target section: up to **6** entries from `games/*.json`, ordered by manifest **file mtime** (newest first), skipping invalid files and deduplicating by canonical `game_dir`; no new manifest fields. Clicking a row selects that game like the folder picker (missing folders show a clear error).
+- **Release v0.5 (current)** — **`rsm` CLI** (`argparse`): catalog refresh, shader apply / update-clones, add-on apply / refresh-catalog, ReShade install/update/remove/check, `game inspect` — all calling existing core; **`fetch_merged_catalogs`** shared with GUI.
+- **v0.4** — **Recent games** in the Target section (mtime-ordered manifests; no new manifest fields).
 - **v0.3** — Startup **catalog hydration**; human-readable **`games/{slug}-{fp8}.json`** manifests with lazy legacy migration.
-- **v0.2** — Official **Addons.ini**–only plugin add-ons, ReShade + shader flows, GTK UI. **Not** in scope: CLI, user-defined plugin add-on catalogs, multi-profile per game.
-- **Deferred (post–v0.2)** — CLI per [PROJECT_SPEC.md](PROJECT_SPEC.md); multi-profile per game remains a non-goal until explicitly planned. ReShade updates: use **Update / Reinstall Latest** or explicit version; no RSM background version notifier.
+- **v0.2** — Official **Addons.ini**–only plugin add-ons, ReShade + shader flows, GTK UI. **Not** in scope: user-defined plugin add-on catalogs, multi-profile per game.
+- **Deferred** — Multi-profile per game remains a non-goal until explicitly planned. ReShade updates: use **Update / Reinstall Latest** or explicit version; no RSM background version notifier.
 
 ---
 
@@ -151,6 +160,7 @@ reshadeshadermanager/
 
 - **Backend:** ReShade install/remove/check, INI search paths, PCGW fetch/cache, `merged_catalog`, **plugin add-ons** from official cached **`Addons.ini`** only (`plugin_addons_catalog.json`), `apply_shader_projection` (full rebuild on Apply; `git_pull=False` on Apply), non-standard repo layouts (nested dirs + file fallback), safe symlink removal under `reshade-shaders/`. Tests: `pytest tests/` (fake zip, mocked git; optional live PCGW with `RSM_NETWORK_TEST=1`).
 - **GTK UI:** Game dir + optional exe, **Recent games** list (v0.4), arch, API/variant/version, Install, **Update / Reinstall Latest** (resolve upstream `latest` at click time, same API/variant), Remove/Check, **startup catalog hydration** + Refresh catalog (forced refresh), **Update local clones** (`git pull` for existing clones in the current catalog), **Add repository…** (user `repos.json`), Manage shaders (checklist + Apply), **Manage plugin add-ons…** (DLL copies + manifest), log panel, **window geometry** persistence (`ui_state.json`).
+- **CLI (v0.5):** Same operations via `rsm` for scripting and headless use (see README).
 - **README / packaging:** See [README.md](README.md) and [packaging/README.md](packaging/README.md) for install and distribution notes.
 - **Known environment:** `latest` resolved via GitHub tags (not `releases/latest`); system `python3-gobject` + `pip install --no-deps -e .` avoids pip-building PyGObject without cairo.
 
@@ -167,11 +177,11 @@ These are **not** required to ship v0.2; track for hardening and packaging follo
 
 ---
 
-## Future milestones (post–v0.2)
+## Future milestones (post–v0.5)
 
 Aligned with [PROJECT_SPEC.md](PROJECT_SPEC.md) deferrals and non-goals:
 
-- **CLI** for scripting installs and shader projection.
+- **CLI** enhancements (JSON output, shell completion, optional config path) beyond the v0.5 `rsm` surface.
 - **DirectX 8 x64 wrapper** if upstream ships a 64-bit `d3d8.dll` (today: 32-bit only).
 - **Multi-profile per game** (explicitly a non-goal unless scope changes).
 

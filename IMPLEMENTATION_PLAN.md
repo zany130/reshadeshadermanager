@@ -127,6 +127,9 @@ Tests: `tests/core/...` (recommended alongside steps below).
 | `link_farm.py` | For enable: ensure `Shaders/` and `Textures/` exist under game `reshade-shaders/`; for each repo, if `<data>/repos/<id>/Shaders` exists, symlink `game/.../Shaders/<id>` → absolute `.../Shaders`; same for `Textures`; record paths under `symlinks_by_repo_id[id]`. For disable: remove only paths listed for that id; prune empty dirs if safe. Collision: target exists and is not our symlink → log + skip. **No per-file symlinks** per decision §0.1. |
 | `main.py` | Application entry; dependency wiring. |
 | `recent_games.py` | List recent manifests by file mtime (walk until 6 valid, dedupe `game_dir`); display names from `game_exe` / directory basename. **No GTK.** |
+| `catalog_ops.py` | `fetch_merged_catalogs` — PCGW + `merged_catalog` + `get_upstream_plugin_addons`; shared by GUI and **`rsm` CLI**. |
+| `error_format.py` | `format_exception_for_ui` for subprocess/HTTP/OSError strings; shared by CLI and UI. |
+| `cli.py` | `argparse` **`rsm`** entry: catalog/shaders/addons/reshade/game commands over core only (**no GTK**). |
 | `main_window.py` | Target selection, **Recent games** list (v0.4), ReShade actions, log panel, **startup catalog hydration** (cache-first; gate Manage shaders / Manage plugin add-ons / Update clones until ready), **Refresh catalog** for forced network refresh, **graphics API combo including dx8 (disabled or “not in v0.1” messaging)**. |
 | `shader_dialog.py` | Merged catalog checklist; apply → `git_sync` + `link_farm` + manifest. |
 | `log_view.py` | Log sink for UI. |

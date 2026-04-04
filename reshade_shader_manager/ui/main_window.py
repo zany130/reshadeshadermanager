@@ -8,6 +8,7 @@ from pathlib import Path
 
 from gi.repository import Gio, GLib, Gtk, Pango
 
+from reshade_shader_manager.core.catalog_ops import fetch_merged_catalogs
 from reshade_shader_manager.core.config import load_config
 from reshade_shader_manager.core.exceptions import RSMError, VersionResolutionError
 from reshade_shader_manager.core.manifest import (
@@ -591,18 +592,7 @@ class MainWindow(Gtk.ApplicationWindow):
             self._show_error("Missing files:\n" + "\n".join(cr.missing_files))
 
     def _fetch_catalogs(self, *, force_refresh: bool) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
-        pcgw = get_pcgw_repos(
-            self._paths,
-            ttl_hours=self._config.pcgw_cache_ttl_hours,
-            force_refresh=force_refresh,
-        )
-        shader_cat = merged_catalog(self._paths, pcgw)
-        plugin_cat = get_upstream_plugin_addons(
-            self._paths,
-            ttl_hours=self._config.plugin_addons_catalog_ttl_hours,
-            force_refresh=force_refresh,
-        )
-        return shader_cat, plugin_cat
+        return fetch_merged_catalogs(self._paths, self._config, force_refresh=force_refresh)
 
     def _set_catalog_dependent_sensitive(self, sensitive: bool) -> None:
         if hasattr(self, "_btn_update_clones"):

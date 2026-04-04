@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import subprocess
 
-from reshade_shader_manager.ui.error_format import format_exception_for_ui
+from reshade_shader_manager.core.error_format import format_exception_for_ui
 
 
 def test_format_called_process_error_includes_stderr() -> None:

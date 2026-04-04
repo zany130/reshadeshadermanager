@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.5.0
+
+### Added
+
+- **CLI (`rsm`):** A stdlib `argparse` command-line interface over the same backend as the GTK app (no GTK import). Console script **`rsm`** alongside **`reshade-shader-manager`**. Commands include:
+  - `rsm catalog refresh` — re-fetch PCGW shader list, merged shader catalog, and official Addons.ini plugin catalog (same as GUI **Refresh catalog**).
+  - `rsm shaders apply` / `rsm shaders update-clones` — shader projection with optional `--git-pull`; bulk `git pull` for existing clones (same as **Update local clones**).
+  - `rsm addons apply` / `rsm addons refresh-catalog` — plugin add-on install/reconcile and optional Addons.ini-only metadata refresh.
+  - `rsm reshade install|update|remove|check` — ReShade binary install/update/remove/check.
+  - `rsm game inspect` — print saved manifest (optional `--json`).
+- **`core/catalog_ops.fetch_merged_catalogs`** — shared catalog fetch used by the GUI and CLI.
+- **`core/error_format`** — exception formatting shared by CLI and UI (UI module re-exports for compatibility).
+
 ## 0.4.0
 
 ### Added
