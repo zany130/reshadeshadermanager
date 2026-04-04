@@ -31,6 +31,32 @@ def load_user_plugin_addons(paths: RsmPaths) -> list[dict[str, str]]:
     return out
 
 
+def upsert_user_plugin_addon(paths: RsmPaths, row: dict[str, str]) -> None:
+    """
+    Replace or append a user ``plugin_addons.json`` row keyed by ``id``.
+
+    Requires at least one of ``download_url_32``, ``download_url_64``, or ``download_url``.
+    """
+    if row.get("source") != "user":
+        raise ValueError("upsert_user_plugin_addon only accepts source=user rows")
+    clean = assert_plugin_addon_row(row)
+    if not (
+        clean.get("download_url_32", "").strip()
+        or clean.get("download_url_64", "").strip()
+        or clean.get("download_url", "").strip()
+    ):
+        raise ValueError("Provide at least one download URL (32-bit, 64-bit, or single URL).")
+    user = load_user_plugin_addons(paths)
+    rid = clean["id"]
+    for i, e in enumerate(user):
+        if e["id"] == rid:
+            user[i] = clean
+            save_user_plugin_addons(paths, user)
+            return
+    user.append(clean)
+    save_user_plugin_addons(paths, user)
+
+
 def save_user_plugin_addons(paths: RsmPaths, addons: list[dict[str, str]]) -> None:
     for a in addons:
         if a.get("source") != "user":

@@ -9,6 +9,7 @@ from reshade_shader_manager.core.plugin_addons_user import (
     load_user_plugin_addons,
     merged_plugin_addon_catalog,
     save_user_plugin_addons,
+    upsert_user_plugin_addon,
 )
 
 
@@ -72,3 +73,52 @@ def test_user_json_roundtrip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     loaded = load_user_plugin_addons(paths)
     assert len(loaded) == 1
     assert loaded[0]["id"] == "my-addon"
+
+
+def test_upsert_replaces_same_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    paths = RsmPaths.from_env()
+    paths.ensure_layout()
+    base = {
+        "name": "One",
+        "description": "",
+        "download_url_32": "",
+        "download_url_64": "",
+        "download_url": "https://a/one",
+        "repository_url": "",
+        "effect_install_path": "",
+        "upstream_section": "",
+        "source": "user",
+    }
+    upsert_user_plugin_addon(paths, {"id": "same", **base})
+    upsert_user_plugin_addon(
+        paths,
+        {
+            "id": "same",
+            **{**base, "name": "Two", "download_url": "https://a/two"},
+        },
+    )
+    loaded = load_user_plugin_addons(paths)
+    assert len(loaded) == 1
+    assert loaded[0]["name"] == "Two"
+    assert loaded[0]["download_url"] == "https://a/two"
+
+
+def test_upsert_requires_download_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    paths = RsmPaths.from_env()
+    paths.ensure_layout()
+    row = {
+        "id": "x",
+        "name": "X",
+        "description": "",
+        "download_url_32": "",
+        "download_url_64": "",
+        "download_url": "",
+        "repository_url": "https://github.com/a/a",
+        "effect_install_path": "",
+        "upstream_section": "",
+        "source": "user",
+    }
+    with pytest.raises(ValueError, match="at least one download URL"):
+        upsert_user_plugin_addon(paths, row)
