@@ -75,6 +75,13 @@ class RsmPaths:
     def pcgw_cache_path(self) -> Path:
         return self.cache_dir / "pcgw_repos.json"
 
+    def plugin_addons_cache_path(self) -> Path:
+        return self.cache_dir / "plugin_addons_catalog.json"
+
+    def plugin_addons_json(self) -> Path:
+        """User-defined plugin add-ons (not upstream ``Addons.ini``)."""
+        return self.config_dir / "plugin_addons.json"
+
     def reshade_latest_cache_path(self) -> Path:
         return self.cache_dir / "reshade_latest_cache.json"
 
