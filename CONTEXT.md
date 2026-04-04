@@ -38,9 +38,9 @@ It is **inspired by** SteamTinkerLaunch (STL) behavior only; it does **not** dep
 
 | Location | Contents |
 |----------|----------|
-| `~/.config/reshade-shader-manager/` | `config.json`, `repos.json` (user repos only), `games/<sha256-of-game_dir>.json` |
-| `~/.local/share/reshade-shader-manager/` | `repos/<id>/` (git clones), `reshade/downloads/`, `reshade/extracted/<version>/`, `logs/` |
-| `~/.cache/reshade-shader-manager/` | `pcgw_repos.json`, `reshade_latest_cache.json` |
+| `~/.config/reshade-shader-manager/` | `config.json`, `repos.json` (user shader repos only), optional `plugin_addons.json` (user plugin add-on rows), `games/<sha256-of-game_dir>.json` |
+| `~/.local/share/reshade-shader-manager/` | `repos/<id>/` (shader git clones), `addons/downloads/` (plugin add-on artifacts), `reshade/downloads/`, `reshade/extracted/<version>/`, `logs/` |
+| `~/.cache/reshade-shader-manager/` | `pcgw_repos.json`, `plugin_addons_catalog.json`, `reshade_latest_cache.json` |
 
 ### Per-game tree (managed)
 
@@ -61,6 +61,18 @@ It is **inspired by** SteamTinkerLaunch (STL) behavior only; it does **not** dep
 7. **DX8** — **d3d8to9** (`d3d8.dll`) + ReShade as `d3d9.dll`; cached under `data/d3d8to9/`. Upstream release is **32-bit PE only** — 64-bit arch → clear `RSMError` (no guess).
 8. **Git concurrency (v0.1)** — `threading.Lock` in `git_sync.py` (in-process only).
 9. **PyGObject** — Declared in `pyproject.toml`; many Fedora users install with `pip install --no-deps -e .` after `dnf install python3-gobject gtk4` to avoid building PyGObject/pycairo from pip.
+
+### Plugin add-ons (v0.2 — artifact-only)
+
+These are ReShade **plugin** DLLs (e.g. `.addon32` / `.addon64`), not the ReShade installer “addon” EXE variant.
+
+- **Model:** **Artifact-only.** RSM downloads by HTTP(S) URL (per-arch and/or single URL), caches under `~/.local/share/.../addons/downloads/`, and may extract ZIPs. There is **no** git clone and **no** install path keyed off a bare `repository_url`.
+- **Upstream:** Official rows come from cached **Addons.ini** (`plugin_addons_catalog.json` after fetch/parse).
+- **User rows:** Optional `plugin_addons.json` merges with upstream (same field shape); user wins on `id` collision.
+- **`repository_url`:** Present on catalog rows for **metadata** (e.g. stable id hashing, upstream reference). It is **not** an install mechanism; do not add repo-based or `git pull` flows for plugin add-ons.
+- **Git** remains for **shader repos** only (`repos/<id>/` and “Update local clones”).
+
+Future UI or tooling for “add a custom plugin add-on” must stay within this model (URLs / ZIPs only).
 
 ---
 
@@ -159,6 +171,7 @@ Aligned with [PROJECT_SPEC.md](PROJECT_SPEC.md) deferrals and non-goals:
 - **CLI** for scripting installs and shader projection.
 - **DirectX 8 x64 wrapper** if upstream ships a 64-bit `d3d8.dll` (today: 32-bit only).
 - **Multi-profile per game** (explicitly a non-goal for v0.1).
+- **Plugin add-ons (v0.2 UI):** e.g. “Add plugin add-on…” to edit `plugin_addons.json` using **download URLs only** (artifact model). No git-backed add-on installs.
 
 ---
 
