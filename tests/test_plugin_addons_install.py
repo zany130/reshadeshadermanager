@@ -12,6 +12,7 @@ from reshade_shader_manager.core.manifest import GameManifest, new_game_manifest
 from reshade_shader_manager.core.paths import RsmPaths
 from reshade_shader_manager.core.plugin_addons_install import (
     apply_plugin_addon_installation,
+    installability_detail,
     pick_payload_from_zip_extract,
     prepare_payload_file,
     resolve_download_url_for_arch,
@@ -64,8 +65,43 @@ def test_resolve_download_missing_raises() -> None:
         "upstream_section": "",
         "source": "upstream",
     }
-    with pytest.raises(RSMError, match="no 64-bit"):
+    with pytest.raises(RSMError, match="no download links"):
         resolve_download_url_for_arch(e, arch="64")
+
+
+def test_resolve_repository_only_raises() -> None:
+    e = {
+        "id": "geo",
+        "name": "Geo3D",
+        "download_url_32": "",
+        "download_url_64": "",
+        "download_url": "",
+        "repository_url": "https://github.com/Flugan/Geo3D-Installer",
+        "description": "",
+        "effect_install_path": "",
+        "upstream_section": "16",
+        "source": "upstream",
+    }
+    with pytest.raises(RSMError, match="repository-only"):
+        resolve_download_url_for_arch(e, arch="64")
+
+
+def test_installability_detail() -> None:
+    e = {
+        "id": "x",
+        "name": "X",
+        "download_url_32": "",
+        "download_url_64": "",
+        "download_url": "",
+        "repository_url": "https://github.com/a/a",
+        "description": "",
+        "effect_install_path": "",
+        "upstream_section": "",
+        "source": "upstream",
+    }
+    ok, reason = installability_detail(e, arch="64")
+    assert ok is False
+    assert "repository-only" in reason
 
 
 def test_pick_zip_single_addon64(tmp_path: Path) -> None:

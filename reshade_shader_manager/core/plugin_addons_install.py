@@ -32,21 +32,48 @@ def resolve_download_url_for_arch(entry: dict[str, str], *, arch: str) -> str:
     u32 = entry.get("download_url_32", "").strip()
     u64 = entry.get("download_url_64", "").strip()
     u1 = entry.get("download_url", "").strip()
+    repo = entry.get("repository_url", "").strip()
+    name = entry.get("name", entry.get("id", "?"))
+
+    if not u32 and not u64 and not u1:
+        if repo:
+            raise RSMError(
+                f"Plugin add-on {name!r} has no download links in the upstream catalog "
+                f"(repository-only entry). Install from the vendor or add URLs in plugin_addons.json."
+            )
+        raise RSMError(
+            f"Plugin add-on {name!r} has no download links in the upstream catalog."
+        )
+
     if arch == "64":
         if u64:
             return u64
         if u1:
             return u1
         raise RSMError(
-            f"Plugin add-on {entry.get('name', entry.get('id', '?'))!r} has no 64-bit download URL."
+            f"Plugin add-on {name!r} has no 64-bit download URL "
+            f"(this add-on may be 32-bit only or list a single-architecture link)."
         )
     if u32:
         return u32
     if u1:
         return u1
     raise RSMError(
-        f"Plugin add-on {entry.get('name', entry.get('id', '?'))!r} has no 32-bit download URL."
+        f"Plugin add-on {name!r} has no 32-bit download URL "
+        f"(this add-on may be 64-bit only or list a single-architecture link)."
     )
+
+
+def installability_detail(entry: dict[str, str], *, arch: str) -> tuple[bool, str]:
+    """
+    Return ``(True, \"\")`` if :func:`resolve_download_url_for_arch` succeeds, else ``(False, reason)``.
+    Used by the UI to disable rows that cannot be installed for the current game architecture.
+    """
+    try:
+        resolve_download_url_for_arch(entry, arch=arch)
+        return True, ""
+    except RSMError as e:
+        return False, str(e)
 
 
 def _http_download(url: str, dest: Path) -> None:
@@ -294,7 +321,7 @@ def apply_plugin_addon_installation(
         try:
             url = resolve_download_url_for_arch(entry, arch=arch)
         except RSMError as e:
-            log.warning("Plugin add-on %r: %s", aid, e)
+            log.debug("Plugin add-on %r: %s", aid, e)
             raise
 
         _remove_addon_install(paths, manifest, gd, aid)

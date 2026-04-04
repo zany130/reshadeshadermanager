@@ -10,7 +10,10 @@ from typing import Callable
 from gi.repository import GLib, Gtk
 
 from reshade_shader_manager.core.manifest import GameManifest
-from reshade_shader_manager.core.plugin_addons_install import apply_plugin_addon_installation
+from reshade_shader_manager.core.plugin_addons_install import (
+    apply_plugin_addon_installation,
+    installability_detail,
+)
 from reshade_shader_manager.core.paths import RsmPaths
 from reshade_shader_manager.ui.error_format import format_exception_for_ui
 
@@ -69,6 +72,7 @@ class PluginAddonWindow(Gtk.Window):
 
         m = sync_manifest()
         enabled = set(m.enabled_plugin_addon_ids)
+        arch = m.reshade_arch if m.reshade_arch in ("32", "64") else "64"
 
         for row in catalog:
             rid = row["id"]
@@ -78,7 +82,13 @@ class PluginAddonWindow(Gtk.Window):
             row_box.set_margin_top(4)
             row_box.set_margin_bottom(4)
             cb = Gtk.CheckButton()
-            cb.set_active(rid in enabled)
+            ok, reason = installability_detail(row, arch=arch)
+            if ok:
+                cb.set_active(rid in enabled)
+            else:
+                cb.set_sensitive(False)
+                cb.set_active(False)
+                row_box.set_tooltip_text(reason)
             self._checks[rid] = cb
             row_box.append(cb)
             src = row.get("source", "")
@@ -88,6 +98,8 @@ class PluginAddonWindow(Gtk.Window):
                 hexpand=True,
                 wrap=True,
             )
+            if not ok:
+                lbl.set_tooltip_text(reason)
             row_box.append(lbl)
             list_box.append(row_box)
 
@@ -111,7 +123,7 @@ class PluginAddonWindow(Gtk.Window):
         if apply_b:
             apply_b.set_sensitive(False)
 
-        desired = {rid for rid, cb in self._checks.items() if cb.get_active()}
+        desired = {rid for rid, cb in self._checks.items() if cb.get_sensitive() and cb.get_active()}
         by_id = {r["id"]: r for r in self._catalog}
 
         def work() -> None:
