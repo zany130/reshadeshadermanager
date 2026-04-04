@@ -88,6 +88,7 @@ reshadeshadermanager/
 │   │   ├── plugin_addons_parse.py   # Addons.ini → stable ids + normalized rows
 │   │   ├── plugin_addons_catalog.py # Fetch/cache upstream list (XDG cache)
 │   │   ├── plugin_addons_user.py    # plugin_addons.json + merged catalog
+│   │   ├── plugin_addons_install.py # copy DLLs, ZIP fail-closed, manifest updates
 │   │   ├── ini.py             # ReShade.ini [GENERAL] search paths only
 │   │   ├── reshade.py         # GitHub tags, download, zip extract, install/remove/check
 │   │   ├── repos.py           # BUILTIN_REPOS, user repos.json, merged_catalog
@@ -101,6 +102,7 @@ reshadeshadermanager/
 │       ├── error_format.py    # user-facing exception strings
 │       ├── main_window.py     # Target, ReShade, shader buttons, workers
 │       ├── shader_dialog.py   # ShaderRepoWindow checklist + apply
+│       ├── plugin_addon_dialog.py  # Plugin add-on checklist + Apply (DLL copies)
 │       └── add_repo_dialog.py # Add user repo → repos.json
 └── tests/
     ├── conftest.py
@@ -135,7 +137,7 @@ reshadeshadermanager/
 ## Current progress (as of this document)
 
 - **Backend:** ReShade install/remove/check, INI search paths, PCGW fetch/cache, `merged_catalog`, **plugin add-on** upstream `Addons.ini` parse (stable ids) + `plugin_addons_catalog.json` cache + `plugin_addons.json` merge, `apply_shader_projection` (full rebuild on Apply; `git_pull=False` on Apply), non-standard repo layouts (nested dirs + file fallback), safe symlink removal under `reshade-shaders/`. Tests: `pytest tests/` (fake zip, mocked git; optional live PCGW with `RSM_NETWORK_TEST=1`).
-- **GTK UI:** Game dir + optional exe, arch, API/variant/version, Install, **Update / Reinstall Latest** (resolve upstream `latest` at click time, same API/variant), Remove/Check, Refresh catalog, **Update local clones** (`git pull` for existing clones in the current catalog), **Add repository…** (user `repos.json`), Manage shaders (checklist + Apply), log panel, **window geometry** persistence (`ui_state.json`).
+- **GTK UI:** Game dir + optional exe, arch, API/variant/version, Install, **Update / Reinstall Latest** (resolve upstream `latest` at click time, same API/variant), Remove/Check, Refresh catalog, **Update local clones** (`git pull` for existing clones in the current catalog), **Add repository…** (user `repos.json`), Manage shaders (checklist + Apply), **Manage plugin add-ons…** (DLL copies + manifest), log panel, **window geometry** persistence (`ui_state.json`).
 - **README / packaging:** See [README.md](README.md) and [packaging/README.md](packaging/README.md) for install and distribution notes.
 - **Known environment:** `latest` resolved via GitHub tags (not `releases/latest`); system `python3-gobject` + `pip install --no-deps -e .` avoids pip-building PyGObject without cairo.
 

@@ -18,6 +18,7 @@ GTK UI (v0.1) is a thin frontend over a metadata-driven backend core.
 - **Add repository…** to append a custom Git repo to `~/.config/.../repos.json`
 - **Update local clones** — `git pull` for catalog repos that already have a clone (Apply does not pull)
 - Manage shaders: enable/disable repos for the selected game (full symlink rebuild on Apply)
+- **Manage plugin add-ons…**: copy selected **plugin** DLLs from the merged catalog into the game folder (fail-closed ZIP handling; does not overwrite unmanaged files; not the ReShade installer “addon” variant)
 - Log panel showing backend progress/errors
 
 ## Requirements
