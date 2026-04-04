@@ -31,14 +31,14 @@ It is **inspired by** SteamTinkerLaunch (STL) behavior only; it does **not** dep
 
 ### Data flow (conceptual)
 
-- **Single source of truth:** JSON metadata under `~/.config/.../games/<game-id>.json` (`GameManifest`), not marker files in the game tree.
+- **Single source of truth:** JSON metadata under `~/.config/.../games/<slug>-<fp8>.json` (`GameManifest`; `fp8` = first 8 hex chars of SHA-256 of the canonical game directory), not marker files in the game tree. Pre–v0.3 `games/<full-sha256>.json` names are still found on load and migrated when touched.
 - **Filesystem** (DLLs, symlinks, `ReShade.ini`) is **derived** from manifest + user actions; repair/drift is informational only unless code explicitly rescans (minimal by design).
 
 ### XDG layout
 
 | Location | Contents |
 |----------|----------|
-| `~/.config/reshade-shader-manager/` | `config.json`, `repos.json` (user shader repos only), `games/<sha256-of-game_dir>.json` |
+| `~/.config/reshade-shader-manager/` | `config.json`, `repos.json` (user shader repos only), `games/<slug>-<fp8>.json` per game (v0.3+; legacy `games/<sha256>.json` still loaded and migrated lazily) |
 | `~/.local/share/reshade-shader-manager/` | `repos/<id>/` (shader git clones), `addons/downloads/` (plugin add-on artifacts), `reshade/downloads/`, `reshade/extracted/<version>/`, `logs/` |
 | `~/.cache/reshade-shader-manager/` | `pcgw_repos.json`, `plugin_addons_catalog.json`, `reshade_latest_cache.json` |
 
@@ -79,7 +79,7 @@ These are ReShade **plugin** DLLs (e.g. `.addon32` / `.addon64`), not the ReShad
 reshadeshadermanager/
 ├── CONTEXT.md                 # This file (AI/human handoff)
 ├── README.md                  # GitHub quickstart
-├── CHANGELOG.md               # Release notes (e.g. v0.2.0)
+├── CHANGELOG.md               # Release notes (e.g. v0.3.0)
 ├── PROJECT_SPEC.md            # Product goals, non-goals, data examples
 ├── IMPLEMENTATION_PLAN.md     # Locked decisions + validation notes
 ├── pyproject.toml             # hatchling, deps, entry point, pytest
@@ -90,7 +90,7 @@ reshadeshadermanager/
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── exceptions.py      # RSMError, VersionResolutionError
-│   │   ├── paths.py           # XDG, game_id (SHA-256 of resolved game_dir)
+│   │   ├── paths.py           # XDG, manifest paths `{slug}-{fp8}.json` + legacy hash id
 │   │   ├── config.py          # config.json
 │   │   ├── manifest.py        # GameManifest, load/save games/*.json
 │   │   ├── targets.py         # GraphicsAPI, PE arch, proxy DLL names, DX8 wrapper constant
@@ -118,7 +118,6 @@ reshadeshadermanager/
     ├── test_paths.py
     ├── test_ini.py
     ├── test_manifest.py
-    ├── test_paths.py
     ├── test_ui_state.py
     ├── test_reshade_version.py
     ├── test_git_sync.py
@@ -139,7 +138,8 @@ reshadeshadermanager/
 - **No flattening** shader repos; **no renaming** shader files.
 - **STL = reference only** — do not port shell/YAD patterns as architecture.
 - **Backend/UI split** — Keep core importable without GTK; avoid heavy logic in UI files.
-- **Release v0.2 (current)** — Ships official **Addons.ini**–only plugin add-ons (see § Plugin add-ons above), ReShade + shader flows, GTK UI as in [README.md](README.md). **Not** in scope: CLI, user-defined plugin add-on catalogs, multi-profile per game.
+- **Release v0.3 (current)** — Startup **catalog hydration** (shader + plugin add-on catalogs from cache/TTL in a background worker; **Manage shaders…**, **Manage plugin add-ons…**, and **Update local clones** stay insensitive until load completes). **Refresh catalog** remains the explicit **force network refresh**. Per-game manifests use human-readable **`games/{slug}-{fp8}.json`** with lazy migration from legacy `games/{sha256}.json` on load/save only (no full `games/` scan at startup).
+- **v0.2** — Official **Addons.ini**–only plugin add-ons, ReShade + shader flows, GTK UI. **Not** in scope: CLI, user-defined plugin add-on catalogs, multi-profile per game.
 - **Deferred (post–v0.2)** — CLI per [PROJECT_SPEC.md](PROJECT_SPEC.md); multi-profile per game remains a non-goal until explicitly planned. ReShade updates: use **Update / Reinstall Latest** or explicit version; no RSM background version notifier.
 
 ---
@@ -147,7 +147,7 @@ reshadeshadermanager/
 ## Current progress (as of this document)
 
 - **Backend:** ReShade install/remove/check, INI search paths, PCGW fetch/cache, `merged_catalog`, **plugin add-ons** from official cached **`Addons.ini`** only (`plugin_addons_catalog.json`), `apply_shader_projection` (full rebuild on Apply; `git_pull=False` on Apply), non-standard repo layouts (nested dirs + file fallback), safe symlink removal under `reshade-shaders/`. Tests: `pytest tests/` (fake zip, mocked git; optional live PCGW with `RSM_NETWORK_TEST=1`).
-- **GTK UI:** Game dir + optional exe, arch, API/variant/version, Install, **Update / Reinstall Latest** (resolve upstream `latest` at click time, same API/variant), Remove/Check, Refresh catalog, **Update local clones** (`git pull` for existing clones in the current catalog), **Add repository…** (user `repos.json`), Manage shaders (checklist + Apply), **Manage plugin add-ons…** (DLL copies + manifest), log panel, **window geometry** persistence (`ui_state.json`).
+- **GTK UI:** Game dir + optional exe, arch, API/variant/version, Install, **Update / Reinstall Latest** (resolve upstream `latest` at click time, same API/variant), Remove/Check, **startup catalog hydration** + Refresh catalog (forced refresh), **Update local clones** (`git pull` for existing clones in the current catalog), **Add repository…** (user `repos.json`), Manage shaders (checklist + Apply), **Manage plugin add-ons…** (DLL copies + manifest), log panel, **window geometry** persistence (`ui_state.json`).
 - **README / packaging:** See [README.md](README.md) and [packaging/README.md](packaging/README.md) for install and distribution notes.
 - **Known environment:** `latest` resolved via GitHub tags (not `releases/latest`); system `python3-gobject` + `pip install --no-deps -e .` avoids pip-building PyGObject without cairo.
 

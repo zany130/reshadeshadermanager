@@ -107,6 +107,96 @@ def game_id_from_game_dir(game_dir: str | Path) -> str:
     return hashlib.sha256(normalized).hexdigest()
 
 
+def game_dir_fingerprint8(game_dir: str | Path) -> str:
+    """First 8 hex chars of SHA-256(canonical game_dir); used in manifest filenames."""
+    return game_id_from_game_dir(game_dir)[:8]
+
+
+def _slugify_manifest_segment(name: str, *, max_len: int = 48) -> str:
+    s = name.strip().lower()
+    s = re.sub(r"[^a-z0-9]+", "-", s)
+    s = re.sub(r"-+", "-", s).strip("-")
+    if not s:
+        return ""
+    if not s[0].isalnum():
+        s = "g-" + s
+    if len(s) > max_len:
+        s = s[:max_len].rstrip("-")
+    return s or "game"
+
+
+def manifest_slug_candidates(game_exe: str | None, game_dir: str | Path) -> list[str]:
+    """
+    Slug segments for manifest filename `{slug}-{fp8}.json`, in preference order.
+
+    1. Executable stem (no extension) if ``game_exe`` is set.
+    2. Game directory basename.
+    3. Literal ``game``.
+    """
+    out: list[str] = []
+    if game_exe and str(game_exe).strip():
+        stem = Path(game_exe).stem
+        seg = _slugify_manifest_segment(stem)
+        if seg:
+            out.append(seg)
+    base = Path(game_dir).resolve().name
+    seg2 = _slugify_manifest_segment(base)
+    if seg2 and seg2 not in out:
+        out.append(seg2)
+    if "game" not in out:
+        out.append("game")
+    return out
+
+
+def new_manifest_path_for_game(
+    paths: RsmPaths,
+    game_dir: str | Path,
+    game_exe: str | None,
+) -> Path:
+    """Preferred human-readable manifest path: ``games/{slug}-{fp8}.json``."""
+    resolved = Path(game_dir).expanduser().resolve()
+    fp8 = game_dir_fingerprint8(resolved)
+    slug = manifest_slug_candidates(game_exe, resolved)[0]
+    return paths.games_dir() / f"{slug}-{fp8}.json"
+
+
+def legacy_game_manifest_path(paths: RsmPaths, game_dir: str | Path) -> Path:
+    """Pre-v0.3 manifest path: ``games/{sha256}.json``."""
+    return paths.game_manifest_path(game_id_from_game_dir(game_dir))
+
+
+def candidate_game_manifest_paths(
+    paths: RsmPaths,
+    game_dir: str | Path,
+    game_exe: str | None,
+) -> list[Path]:
+    """
+    Paths to try when loading, in order: explicit ``{slug}-{fp8}.json`` candidates, any other
+    ``*-{fp8}.json`` in ``games/`` (not a full-catalog scan), then legacy hash name.
+    """
+    resolved = Path(game_dir).expanduser().resolve()
+    fp8 = game_dir_fingerprint8(resolved)
+    seen: set[str] = set()
+    out: list[Path] = []
+
+    def add(p: Path) -> None:
+        key = str(p.resolve())
+        if key not in seen:
+            seen.add(key)
+            out.append(p)
+
+    for slug in manifest_slug_candidates(game_exe, resolved):
+        add(paths.games_dir() / f"{slug}-{fp8}.json")
+
+    games = paths.games_dir()
+    if games.is_dir():
+        for p in sorted(games.glob(f"*-{fp8}.json")):
+            add(p)
+
+    add(legacy_game_manifest_path(paths, resolved))
+    return out
+
+
 def get_paths(*, ensure_layout: bool = True) -> RsmPaths:
     """Default RsmPaths from environment; optionally create base directories."""
     p = RsmPaths.from_env()

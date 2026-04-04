@@ -115,9 +115,9 @@ Tests: `tests/core/...` (recommended alongside steps below).
 
 | Module | Responsibility |
 |--------|----------------|
-| `paths.py` | Resolve XDG dirs; subpaths for data/cache/config; `game_id_from_game_dir()` (stable, documented); helpers for symlink paths under game and clone roots. |
+| `paths.py` | Resolve XDG dirs; subpaths for data/cache/config; `game_id_from_game_dir()` (legacy manifest names); `game_dir_fingerprint8`, `new_manifest_path_for_game`, `candidate_game_manifest_paths` (v0.3+ `{slug}-{fp8}.json`); helpers for symlink paths under game and clone roots. |
 | `config.py` | `config.json` I/O, defaults, validation. |
-| `manifest.py` | `games/<game-id>.json` I/O; atomic writes; validate `symlinks_by_repo_id`, `enabled_repo_ids`, installed files; no disk scan as source of truth. |
+| `manifest.py` | Per-game JSON under `games/{slug}-{fp8}.json` (v0.3+), with lazy migration from `games/<sha256>.json` on load/save; atomic writes; validate `symlinks_by_repo_id`, `enabled_repo_ids`, installed files; manifest content is source of truth (not a directory listing). |
 | `targets.py` | Canonical absolute `game_dir`, optional `game_exe`, PE arch → `reshade_arch`; holds selected `graphics_api` / `reshade_variant` for calls into `reshade.py`. |
 | `reshade.py` | Version resolution, download to data `reshade/downloads/`, extract to `reshade/extracted/<version>/`, API→DLL mapping, copy files, update `installed_reshade_files`; remove/check; **DX8: stub only** until implemented. |
 | `ini.py` | Read INI; patch **only** managed search-path keys; leave all other content unchanged; honor `create_ini_if_missing`. Never delete INI on uninstall (default). |
@@ -126,7 +126,7 @@ Tests: `tests/core/...` (recommended alongside steps below).
 | `git_sync.py` | `clone_or_pull(data_dir/repos/<id>, url)`. |
 | `link_farm.py` | For enable: ensure `Shaders/` and `Textures/` exist under game `reshade-shaders/`; for each repo, if `<data>/repos/<id>/Shaders` exists, symlink `game/.../Shaders/<id>` → absolute `.../Shaders`; same for `Textures`; record paths under `symlinks_by_repo_id[id]`. For disable: remove only paths listed for that id; prune empty dirs if safe. Collision: target exists and is not our symlink → log + skip. **No per-file symlinks** per decision §0.1. |
 | `main.py` | Application entry; dependency wiring. |
-| `main_window.py` | Target selection, ReShade actions, log panel, **graphics API combo including dx8 (disabled or “not in v0.1” messaging)**. |
+| `main_window.py` | Target selection, ReShade actions, log panel, **startup catalog hydration** (cache-first; gate Manage shaders / Manage plugin add-ons / Update clones until ready), **Refresh catalog** for forced network refresh, **graphics API combo including dx8 (disabled or “not in v0.1” messaging)**. |
 | `shader_dialog.py` | Merged catalog checklist; apply → `git_sync` + `link_farm` + manifest. |
 | `log_view.py` | Log sink for UI. |
 
@@ -216,7 +216,9 @@ Same as prior plan: `default_reshade_version`, `default_variant` (`standard`|`ad
 
 Unchanged intent: `fetched_at_utc`, `repos[]` with `source: "pcgw"`, optional error field.
 
-### `games/<game-id>.json` (per-game)
+### `games/<slug>-<fp8>.json` (per-game, v0.3+)
+
+**Filename (v0.3):** Human-readable stem `{slug}-{fp8}`: `slug` prefers the selected executable’s stem, else the game directory basename, else `game` (normalized). `fp8` is the first 8 hex characters of `SHA-256(canonical game_dir)` (same hash input as the legacy opaque id). **Legacy:** `games/<full-sha256>.json` is still discovered per game when loading; the file is migrated to the new name after a successful atomic write, then removed. **No** bulk migration or `games/` directory scan at application startup.
 
 **Required / locked fields:**
 
@@ -269,6 +271,12 @@ Per **§0b.1**: remove **only** files in `installed_reshade_files`; do **not** r
 
 1. `repos.py` merged catalog = built-in (code) + `repos.json` (user) + PCGW (from cache/live per TTL).  
 2. `git_sync` on `~/.local/share/.../repos/<id>`.
+
+### Catalog hydration (UI, v0.3)
+
+1. After the main window is shown, load PCGW + merged shader catalog + official plugin add-on catalog **once** in a worker thread with **`force_refresh=False`** (cache/TTL semantics unchanged).  
+2. Until that completes successfully, **Manage shaders…**, **Manage plugin add-ons…**, and **Update local clones** stay **disabled**.  
+3. **Refresh catalog** uses **`force_refresh=True`** (explicit user-driven network refresh). Failure on initial hydration surfaces an error and suggests **Refresh catalog** to retry.
 
 ### Enable repo
 

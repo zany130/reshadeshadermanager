@@ -66,6 +66,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self._pending_maximize = bool(ui and ui.maximized)
         self._catalog: list[dict[str, str]] | None = None
         self._plugin_addon_catalog: list[dict[str, str]] | None = None
+        self._catalog_hydrated: bool = False
         self._game_dir: Path | None = None
         self._exe_path: Path | None = None
         self._arch_display = "—"
@@ -109,6 +110,9 @@ class MainWindow(Gtk.ApplicationWindow):
 
         setup_gui_logging(self._log_panel)
         log.info("RSM UI ready (config %s)", self._paths.config_dir)
+
+        self._set_catalog_dependent_sensitive(False)
+        GLib.idle_add(self._schedule_initial_catalog_hydration)
 
         self.connect("close-request", self._on_close_request)
         if self._pending_maximize:
@@ -205,34 +209,37 @@ class MainWindow(Gtk.ApplicationWindow):
     def _build_shader_section(self) -> Gtk.Widget:
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         row.set_hexpand(True)
-        b_ref = Gtk.Button(label="Refresh catalog")
-        b_ref.connect("clicked", self._on_refresh_catalog)
-        b_pull = Gtk.Button(label="Update local clones")
-        b_pull.set_tooltip_text(
+        self._btn_refresh_catalog = Gtk.Button(label="Refresh catalog")
+        self._btn_refresh_catalog.set_tooltip_text(
+            "Re-fetch shader and plugin add-on lists from the network (uses cache when offline)."
+        )
+        self._btn_refresh_catalog.connect("clicked", self._on_refresh_catalog)
+        self._btn_update_clones = Gtk.Button(label="Update local clones")
+        self._btn_update_clones.set_tooltip_text(
             "Run git pull for repos that already have a clone under ~/.local/share/…/repos/"
         )
-        b_pull.connect("clicked", self._on_update_local_clones)
-        b_add = Gtk.Button(label="Add repository…")
-        b_add.connect("clicked", self._on_add_repository)
-        b_man = Gtk.Button(label="Manage shaders…")
-        b_man.add_css_class("suggested-action")
-        b_man.connect("clicked", self._on_manage_shaders)
-        row.append(b_ref)
-        row.append(b_pull)
-        row.append(b_add)
-        row.append(b_man)
+        self._btn_update_clones.connect("clicked", self._on_update_local_clones)
+        self._btn_add_repo = Gtk.Button(label="Add repository…")
+        self._btn_add_repo.connect("clicked", self._on_add_repository)
+        self._btn_manage_shaders = Gtk.Button(label="Manage shaders…")
+        self._btn_manage_shaders.add_css_class("suggested-action")
+        self._btn_manage_shaders.connect("clicked", self._on_manage_shaders)
+        row.append(self._btn_refresh_catalog)
+        row.append(self._btn_update_clones)
+        row.append(self._btn_add_repo)
+        row.append(self._btn_manage_shaders)
         return row
 
     def _build_plugin_addon_section(self) -> Gtk.Widget:
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         row.set_hexpand(True)
-        b = Gtk.Button(label="Manage plugin add-ons…")
-        b.set_tooltip_text(
+        self._btn_manage_plugin_addons = Gtk.Button(label="Manage plugin add-ons…")
+        self._btn_manage_plugin_addons.set_tooltip_text(
             "Copy official upstream (Addons.ini) ReShade plugin DLLs into the game folder "
             "(not the ReShade installer “addon” variant)."
         )
-        b.connect("clicked", self._on_manage_plugin_addons)
-        row.append(b)
+        self._btn_manage_plugin_addons.connect("clicked", self._on_manage_plugin_addons)
+        row.append(self._btn_manage_plugin_addons)
         return row
 
     def _on_close_request(self, *_args) -> bool:
@@ -515,30 +522,70 @@ class MainWindow(Gtk.ApplicationWindow):
         else:
             self._show_error("Missing files:\n" + "\n".join(cr.missing_files))
 
+    def _fetch_catalogs(self, *, force_refresh: bool) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+        pcgw = get_pcgw_repos(
+            self._paths,
+            ttl_hours=self._config.pcgw_cache_ttl_hours,
+            force_refresh=force_refresh,
+        )
+        shader_cat = merged_catalog(self._paths, pcgw)
+        plugin_cat = get_upstream_plugin_addons(
+            self._paths,
+            ttl_hours=self._config.plugin_addons_catalog_ttl_hours,
+            force_refresh=force_refresh,
+        )
+        return shader_cat, plugin_cat
+
+    def _set_catalog_dependent_sensitive(self, sensitive: bool) -> None:
+        if hasattr(self, "_btn_update_clones"):
+            self._btn_update_clones.set_sensitive(sensitive)
+            self._btn_manage_shaders.set_sensitive(sensitive)
+        if hasattr(self, "_btn_manage_plugin_addons"):
+            self._btn_manage_plugin_addons.set_sensitive(sensitive)
+
+    def _apply_catalog_result(
+        self,
+        pair: tuple[list[dict[str, str]], list[dict[str, str]]],
+    ) -> None:
+        cat, plugin_cat = pair
+        self._catalog = cat
+        self._plugin_addon_catalog = plugin_cat
+        self._catalog_hydrated = True
+        self._set_catalog_dependent_sensitive(True)
+        log.info(
+            "Catalog loaded: %d shader repos; %d plugin add-ons (official Addons.ini)",
+            len(cat),
+            len(plugin_cat),
+        )
+
+    def _schedule_initial_catalog_hydration(self) -> bool:
+        self._run_worker(
+            lambda: self._fetch_catalogs(force_refresh=False),
+            self._on_initial_catalog_ok,
+            self._on_initial_catalog_err,
+        )
+        return False
+
+    def _on_initial_catalog_ok(
+        self,
+        pair: tuple[list[dict[str, str]], list[dict[str, str]]],
+    ) -> None:
+        self._apply_catalog_result(pair)
+
+    def _on_initial_catalog_err(self, e: BaseException) -> None:
+        log.exception("Initial catalog load failed")
+        self._show_error(
+            "Could not load shader/plugin catalogs from cache or network:\n"
+            f"{format_exception_for_ui(e)}\n\n"
+            "Use “Refresh catalog” to retry."
+        )
+
     def _on_refresh_catalog(self, _btn: Gtk.Button) -> None:
         def task():
-            pcgw = get_pcgw_repos(
-                self._paths,
-                ttl_hours=self._config.pcgw_cache_ttl_hours,
-                force_refresh=True,
-            )
-            shader_cat = merged_catalog(self._paths, pcgw)
-            plugin_cat = get_upstream_plugin_addons(
-                self._paths,
-                ttl_hours=self._config.plugin_addons_catalog_ttl_hours,
-                force_refresh=True,
-            )
-            return shader_cat, plugin_cat
+            return self._fetch_catalogs(force_refresh=True)
 
         def ok(pair: tuple[list[dict[str, str]], list[dict[str, str]]]) -> None:
-            cat, plugin_cat = pair
-            self._catalog = cat
-            self._plugin_addon_catalog = plugin_cat
-            log.info(
-                "Catalog loaded: %d shader repos; %d plugin add-ons (official Addons.ini)",
-                len(cat),
-                len(plugin_cat),
-            )
+            self._apply_catalog_result(pair)
 
         def err(e: BaseException) -> None:
             self._show_error(f"Catalog refresh failed:\n{format_exception_for_ui(e)}")
@@ -546,8 +593,8 @@ class MainWindow(Gtk.ApplicationWindow):
         self._run_worker(task, ok, err)
 
     def _on_update_local_clones(self, _btn: Gtk.Button) -> None:
-        if not self._catalog:
-            self._show_error("Refresh catalog first so RSM knows which repositories to update.")
+        if not self._catalog_hydrated or self._catalog is None:
+            self._show_error("Catalog is still loading or failed to load. Use “Refresh catalog” to retry.")
             return
 
         def task():
@@ -583,6 +630,8 @@ class MainWindow(Gtk.ApplicationWindow):
                     ttl_hours=self._config.plugin_addons_catalog_ttl_hours,
                     force_refresh=False,
                 )
+                self._catalog_hydrated = True
+                self._set_catalog_dependent_sensitive(True)
                 log.info(
                     "Catalog reloaded after adding user repo (%d shader repos, %d plugin add-ons)",
                     len(self._catalog),
@@ -598,8 +647,8 @@ class MainWindow(Gtk.ApplicationWindow):
         if not self._game_dir:
             self._show_error("Select a game directory.")
             return
-        if not self._catalog:
-            self._show_error("Click “Refresh catalog” first.")
+        if not self._catalog_hydrated or self._catalog is None:
+            self._show_error("Catalog is still loading or failed to load. Use “Refresh catalog” to retry.")
             return
         win = ShaderRepoWindow(
             parent=self,
@@ -621,8 +670,8 @@ class MainWindow(Gtk.ApplicationWindow):
                 "downloads match the game."
             )
             return
-        if not self._plugin_addon_catalog:
-            self._show_error('Click “Refresh catalog” first (loads the plugin add-on list).')
+        if not self._catalog_hydrated or self._plugin_addon_catalog is None:
+            self._show_error("Catalog is still loading or failed to load. Use “Refresh catalog” to retry.")
             return
         win = PluginAddonWindow(
             parent=self,

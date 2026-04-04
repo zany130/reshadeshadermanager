@@ -3,11 +3,20 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any, Mapping
 
-from reshade_shader_manager.core.paths import RsmPaths, game_id_from_game_dir
+from reshade_shader_manager.core.paths import (
+    RsmPaths,
+    candidate_game_manifest_paths,
+    game_dir_fingerprint8,
+    legacy_game_manifest_path,
+    new_manifest_path_for_game,
+)
+
+log = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 2
 
@@ -121,33 +130,103 @@ class GameManifest:
 
 
 def manifest_path_for_game_dir(paths: RsmPaths, game_dir: str | Path) -> Path:
-    gid = game_id_from_game_dir(game_dir)
-    return paths.game_manifest_path(gid)
+    """Preferred human-readable path ``{slug}-{fp8}.json`` (exe unknown; uses directory basename)."""
+    return new_manifest_path_for_game(paths, game_dir, None)
 
 
-def load_game_manifest(paths: RsmPaths, game_dir: str | Path) -> GameManifest | None:
-    path = manifest_path_for_game_dir(paths, game_dir)
-    if not path.is_file():
-        return None
-    with path.open("r", encoding="utf-8") as f:
-        data = json.load(f)
-    if not isinstance(data, dict):
-        raise ValueError("game manifest must be a JSON object")
-    m = GameManifest.from_mapping(data)
-    m.validate()
-    return m
+def _canonical_game_dir_str(game_dir: str | Path) -> str:
+    return str(Path(game_dir).expanduser().resolve())
 
 
-def save_game_manifest(paths: RsmPaths, manifest: GameManifest) -> None:
-    manifest.validate()
-    gid = game_id_from_game_dir(manifest.game_dir)
-    path = paths.game_manifest_path(gid)
+def _write_manifest_atomic(paths: RsmPaths, manifest: GameManifest, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     with tmp.open("w", encoding="utf-8") as f:
         json.dump(manifest.to_json_dict(), f, indent=2, sort_keys=True)
         f.write("\n")
     tmp.replace(path)
+
+
+def _migrate_legacy_manifest(
+    paths: RsmPaths,
+    manifest: GameManifest,
+    legacy_path: Path,
+) -> None:
+    target = new_manifest_path_for_game(paths, manifest.game_dir, manifest.game_exe)
+    if legacy_path.resolve() == target.resolve():
+        return
+    _write_manifest_atomic(paths, manifest, target)
+    try:
+        legacy_path.unlink()
+    except OSError as e:
+        log.warning("Could not remove legacy manifest %s: %s", legacy_path, e)
+
+
+def load_game_manifest(
+    paths: RsmPaths,
+    game_dir: str | Path,
+    game_exe: str | None = None,
+) -> GameManifest | None:
+    """
+    Load manifest for ``game_dir``, trying human-readable paths and legacy hash name.
+
+    Lazy migration: if the only match is the legacy ``{sha256}.json``, load and migrate
+    to ``{slug}-{fp8}.json`` after a successful write to the new path.
+    """
+    cgd = _canonical_game_dir_str(game_dir)
+    for path in candidate_game_manifest_paths(paths, game_dir, game_exe):
+        if not path.is_file():
+            continue
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError, UnicodeError) as e:
+            log.warning("Could not read manifest %s: %s", path, e)
+            continue
+        if not isinstance(data, dict):
+            continue
+        try:
+            file_gd = _canonical_game_dir_str(data.get("game_dir", ""))
+        except OSError:
+            continue
+        if file_gd != cgd:
+            log.warning("Skipping manifest %s: game_dir does not match this game", path)
+            continue
+        try:
+            m = GameManifest.from_mapping(data)
+            m.validate()
+        except ValueError as e:
+            log.warning("Invalid manifest %s: %s", path, e)
+            continue
+
+        if path.resolve() == legacy_game_manifest_path(paths, game_dir).resolve():
+            _migrate_legacy_manifest(paths, m, path)
+        return m
+    return None
+
+
+def save_game_manifest(paths: RsmPaths, manifest: GameManifest) -> None:
+    manifest.validate()
+    cgd = _canonical_game_dir_str(manifest.game_dir)
+    target = new_manifest_path_for_game(paths, cgd, manifest.game_exe)
+    fp8 = game_dir_fingerprint8(cgd)
+    leg = legacy_game_manifest_path(paths, cgd)
+
+    _write_manifest_atomic(paths, manifest, target)
+
+    games = paths.games_dir()
+    if games.is_dir():
+        for p in games.glob(f"*-{fp8}.json"):
+            if p.resolve() != target.resolve():
+                try:
+                    p.unlink()
+                except OSError as e:
+                    log.warning("Could not remove old manifest %s: %s", p, e)
+    if leg.is_file() and leg.resolve() != target.resolve():
+        try:
+            leg.unlink()
+        except OSError as e:
+            log.warning("Could not remove legacy manifest %s: %s", leg, e)
 
 
 def new_game_manifest(game_dir: str | Path, *, game_exe: str | None = None) -> GameManifest:

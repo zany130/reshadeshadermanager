@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.3.0
+
+### Added
+
+- **Startup catalog hydration:** Shader and plugin add-on catalogs load in the background after the window appears (cache-first, same TTL/stale behavior as before). **Manage shaders…**, **Manage plugin add-ons…**, and **Update local clones** are disabled until that load finishes.
+- **Human-readable game manifests:** Preferred path `games/{slug}-{fp8}.json` (`fp8` = first 8 hex chars of the existing per-directory hash). Legacy `games/<full-sha256>.json` files are still found when loading a game and are migrated lazily on load/save (no full-directory scan at startup).
+
+### Changed
+
+- **Refresh catalog** is the only action that forces a network refresh (`force_refresh=True`); its tooltip describes that behavior.
+- **PCGW user-agent** string uses the installed package version from metadata.
+
 ## 0.2.0
 
 ### Added

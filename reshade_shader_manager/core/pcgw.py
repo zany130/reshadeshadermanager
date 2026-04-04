@@ -10,6 +10,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +30,15 @@ PCGW_API = (
         }
     )
 )
-USER_AGENT = "reshade-shader-manager/0.1 (PCGW repo list; +https://github.com/)"
+def _user_agent() -> str:
+    try:
+        ver = version("reshade-shader-manager")
+    except PackageNotFoundError:
+        ver = "0.0.0"
+    return f"reshade-shader-manager/{ver} (PCGW repo list; +https://github.com/)"
+
+
+USER_AGENT = _user_agent()
 
 
 def _http_get(url: str, *, timeout: float = 45.0) -> bytes:

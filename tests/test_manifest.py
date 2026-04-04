@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from reshade_shader_manager.core.manifest import SCHEMA_VERSION, GameManifest, load_game_manifest, save_game_manifest
-from reshade_shader_manager.core.paths import RsmPaths, game_id_from_game_dir
+from reshade_shader_manager.core.paths import RsmPaths, game_id_from_game_dir, new_manifest_path_for_game
 
 
 def test_manifest_roundtrip(tmp_path: Path, monkeypatch) -> None:
@@ -28,7 +28,9 @@ def test_manifest_roundtrip(tmp_path: Path, monkeypatch) -> None:
         plugin_addon_companion_symlinks={"swapchain-override": ["/game/reshade-shaders/Shaders/addons/x/a.fx"]},
     )
     save_game_manifest(paths, m)
-    assert paths.game_manifest_path(game_id_from_game_dir(game_dir)).is_file()
+    preferred = new_manifest_path_for_game(paths, game_dir, None)
+    assert preferred.is_file()
+    assert not paths.game_manifest_path(game_id_from_game_dir(game_dir)).is_file()
     m2 = load_game_manifest(paths, game_dir)
     assert m2 is not None
     assert m2.schema_version == SCHEMA_VERSION
@@ -50,6 +52,7 @@ def test_manifest_load_schema_v1_migrates_to_v2(tmp_path: Path, monkeypatch) -> 
     game_dir.mkdir()
     gid = game_id_from_game_dir(game_dir)
     mp = paths.game_manifest_path(gid)
+    new_path = new_manifest_path_for_game(paths, game_dir, None)
     mp.parent.mkdir(parents=True, exist_ok=True)
     legacy = {
         "schema_version": 1,
@@ -71,9 +74,11 @@ def test_manifest_load_schema_v1_migrates_to_v2(tmp_path: Path, monkeypatch) -> 
     assert m.enabled_plugin_addon_ids == []
     assert m.plugin_addon_root_copies == {}
     assert m.plugin_addon_companion_symlinks == {}
+    assert not mp.is_file()
+    assert new_path.is_file()
 
     save_game_manifest(paths, m)
-    data = json.loads(mp.read_text(encoding="utf-8"))
+    data = json.loads(new_path.read_text(encoding="utf-8"))
     assert data["schema_version"] == SCHEMA_VERSION
     assert data["enabled_plugin_addon_ids"] == []
     assert data["plugin_addon_root_copies"] == {}
