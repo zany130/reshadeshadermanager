@@ -65,6 +65,15 @@ def _filter_addons_ini_comment_lines(text: str) -> str:
     return "\n".join(kept)
 
 
+def _raw_section_has_download_urls(raw: dict[str, str]) -> bool:
+    """True if the section lists at least one of DownloadUrl32 / DownloadUrl64 / DownloadUrl."""
+    return bool(
+        raw.get("downloadurl32", "").strip()
+        or raw.get("downloadurl64", "").strip()
+        or raw.get("downloadurl", "").strip()
+    )
+
+
 def parse_addons_ini_sections(text: str) -> list[tuple[str, dict[str, str]]]:
     """Return ``(section_name, lowercased_key -> value)`` for each INI section."""
     body = _filter_addons_ini_comment_lines(text)
@@ -114,12 +123,15 @@ def parse_and_normalize_addons_ini(text: str) -> list[dict[str, str]]:
     """
     Parse full ``Addons.ini`` body into normalized upstream entries.
 
-    Drops sections without ``PackageName``. De-duplicates by stable ``id`` (first wins).
+    Drops sections without ``PackageName``, sections with **no download URLs** (repository-only
+    metadata like Geo3D / PyHook), then de-duplicates by stable ``id`` (first wins).
     """
     seen: set[str] = set()
     out: list[dict[str, str]] = []
     for sec, raw in parse_addons_ini_sections(text):
         if not raw.get("packagename", "").strip():
+            continue
+        if not _raw_section_has_download_urls(raw):
             continue
         row = normalize_upstream_plugin_addon(sec, raw)
         rid = row["id"]

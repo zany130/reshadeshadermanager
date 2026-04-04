@@ -84,3 +84,13 @@ def test_skips_section_without_package_name() -> None:
 RepositoryUrl=https://github.com/x/x
 """
     assert parse_and_normalize_addons_ini(ini) == []
+
+
+def test_skips_repository_only_without_download_urls() -> None:
+    """Upstream metadata-only rows (e.g. Geo3D) have no installable artifact."""
+    ini = """
+[geo]
+PackageName=Geo3D by Flugan
+RepositoryUrl=https://github.com/Flugan/Geo3D-Installer
+"""
+    assert parse_and_normalize_addons_ini(ini) == []

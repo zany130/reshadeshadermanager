@@ -67,13 +67,25 @@ def resolve_download_url_for_arch(entry: dict[str, str], *, arch: str) -> str:
 def installability_detail(entry: dict[str, str], *, arch: str) -> tuple[bool, str]:
     """
     Return ``(True, \"\")`` if :func:`resolve_download_url_for_arch` succeeds, else ``(False, reason)``.
-    Used by the UI to disable rows that cannot be installed for the current game architecture.
+    Used to filter catalog rows by game architecture.
     """
     try:
         resolve_download_url_for_arch(entry, arch=arch)
         return True, ""
     except RSMError as e:
         return False, str(e)
+
+
+def filter_catalog_installable_for_arch(
+    catalog: list[dict[str, str]], *, arch: str
+) -> list[dict[str, str]]:
+    """Return only rows installable for ``arch`` (e.g. hide 64-only add-ons when the game is 32-bit)."""
+    out: list[dict[str, str]] = []
+    for row in catalog:
+        ok, _ = installability_detail(row, arch=arch)
+        if ok:
+            out.append(row)
+    return out
 
 
 def _http_download(url: str, dest: Path) -> None:

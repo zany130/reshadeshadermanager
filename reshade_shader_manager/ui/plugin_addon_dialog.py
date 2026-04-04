@@ -12,7 +12,7 @@ from gi.repository import GLib, Gtk
 from reshade_shader_manager.core.manifest import GameManifest
 from reshade_shader_manager.core.plugin_addons_install import (
     apply_plugin_addon_installation,
-    installability_detail,
+    filter_catalog_installable_for_arch,
 )
 from reshade_shader_manager.core.paths import RsmPaths
 from reshade_shader_manager.ui.error_format import format_exception_for_ui
@@ -56,7 +56,8 @@ class PluginAddonWindow(Gtk.Window):
 
         hint = Gtk.Label(
             label="Copies add-on DLLs into the game directory (not symlinks). "
-            "Requires 32/64-bit detection to match the download. "
+            "Only entries with a download URL for your game architecture are listed "
+            "(repository-only upstream rows are omitted). "
             "This is not the ReShade installer “addon” variant.",
             xalign=0.0,
             wrap=True,
@@ -73,35 +74,40 @@ class PluginAddonWindow(Gtk.Window):
         m = sync_manifest()
         enabled = set(m.enabled_plugin_addon_ids)
         arch = m.reshade_arch if m.reshade_arch in ("32", "64") else "64"
+        eligible = filter_catalog_installable_for_arch(catalog, arch=arch)
 
-        for row in catalog:
-            rid = row["id"]
-            row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-            row_box.set_margin_start(8)
-            row_box.set_margin_end(8)
-            row_box.set_margin_top(4)
-            row_box.set_margin_bottom(4)
-            cb = Gtk.CheckButton()
-            ok, reason = installability_detail(row, arch=arch)
-            if ok:
-                cb.set_active(rid in enabled)
-            else:
-                cb.set_sensitive(False)
-                cb.set_active(False)
-                row_box.set_tooltip_text(reason)
-            self._checks[rid] = cb
-            row_box.append(cb)
-            src = row.get("source", "")
-            lbl = Gtk.Label(
-                label=f"{row.get('name', rid)}  ({rid}) — {src}",
-                xalign=0.0,
-                hexpand=True,
-                wrap=True,
+        if not eligible:
+            empty_row = Gtk.ListBoxRow()
+            empty_row.set_child(
+                Gtk.Label(
+                    label="No plugin add-ons are available for this game architecture, "
+                    "or none list a download URL that matches it.",
+                    xalign=0.0,
+                    wrap=True,
+                )
             )
-            if not ok:
-                lbl.set_tooltip_text(reason)
-            row_box.append(lbl)
-            list_box.append(row_box)
+            list_box.append(empty_row)
+        else:
+            for row in eligible:
+                rid = row["id"]
+                row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+                row_box.set_margin_start(8)
+                row_box.set_margin_end(8)
+                row_box.set_margin_top(4)
+                row_box.set_margin_bottom(4)
+                cb = Gtk.CheckButton()
+                cb.set_active(rid in enabled)
+                self._checks[rid] = cb
+                row_box.append(cb)
+                src = row.get("source", "")
+                lbl = Gtk.Label(
+                    label=f"{row.get('name', rid)}  ({rid}) — {src}",
+                    xalign=0.0,
+                    hexpand=True,
+                    wrap=True,
+                )
+                row_box.append(lbl)
+                list_box.append(row_box)
 
         btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         btn_row.set_halign(Gtk.Align.END)
@@ -123,7 +129,7 @@ class PluginAddonWindow(Gtk.Window):
         if apply_b:
             apply_b.set_sensitive(False)
 
-        desired = {rid for rid, cb in self._checks.items() if cb.get_sensitive() and cb.get_active()}
+        desired = {rid for rid, cb in self._checks.items() if cb.get_active()}
         by_id = {r["id"]: r for r in self._catalog}
 
         def work() -> None:

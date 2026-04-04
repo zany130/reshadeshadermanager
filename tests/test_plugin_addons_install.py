@@ -12,6 +12,7 @@ from reshade_shader_manager.core.manifest import GameManifest, new_game_manifest
 from reshade_shader_manager.core.paths import RsmPaths
 from reshade_shader_manager.core.plugin_addons_install import (
     apply_plugin_addon_installation,
+    filter_catalog_installable_for_arch,
     installability_detail,
     pick_payload_from_zip_extract,
     prepare_payload_file,
@@ -102,6 +103,40 @@ def test_installability_detail() -> None:
     ok, reason = installability_detail(e, arch="64")
     assert ok is False
     assert "repository-only" in reason
+
+
+def _entry(
+    eid: str,
+    *,
+    u32: str = "",
+    u64: str = "",
+    u1: str = "",
+    repo: str = "",
+) -> dict[str, str]:
+    return {
+        "id": eid,
+        "name": eid,
+        "download_url_32": u32,
+        "download_url_64": u64,
+        "download_url": u1,
+        "repository_url": repo,
+        "description": "",
+        "effect_install_path": "",
+        "upstream_section": "",
+        "source": "upstream",
+    }
+
+
+def test_filter_catalog_installable_for_arch() -> None:
+    both = _entry("both", u32="https://x/32", u64="https://x/64")
+    sixtyfour_only = _entry("64only", u64="https://x/64only")
+    repo_only = _entry("repo", repo="https://github.com/a/a")
+    cat = [both, sixtyfour_only, repo_only]
+    assert [r["id"] for r in filter_catalog_installable_for_arch(cat, arch="32")] == ["both"]
+    assert [r["id"] for r in filter_catalog_installable_for_arch(cat, arch="64")] == [
+        "both",
+        "64only",
+    ]
 
 
 def test_pick_zip_single_addon64(tmp_path: Path) -> None:
