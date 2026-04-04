@@ -94,6 +94,8 @@ def _prune_empty_parents(leaf: Path, stop_at: Path) -> None:
             break
         try:
             next_cur = cur.parent
+            if next_cur == cur:
+                break
             if not any(cur.iterdir()):
                 cur.rmdir()
             cur = next_cur
