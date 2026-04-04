@@ -116,6 +116,11 @@ def normalize_upstream_plugin_addon(
         "effect_install_path": effect,
         "upstream_section": upstream_section,
         "source": "upstream",
+        "install_mode": "artifact",
+        "dll_32_path": "",
+        "dll_64_path": "",
+        "shader_root": "",
+        "companion_shader_paths": "",
     }
 
 
@@ -143,7 +148,12 @@ def parse_and_normalize_addons_ini(text: str) -> list[dict[str, str]]:
 
 
 def assert_plugin_addon_row(m: Mapping[str, Any]) -> dict[str, str]:
-    """Validate keys for a catalog row (upstream or user)."""
+    """
+    Validate keys for a catalog row (upstream or user).
+
+    **v0.2:** ``install_mode`` is ``artifact`` (download URLs) or ``repo`` (git clone +
+    ``dll_32_path`` / ``dll_64_path``). Empty ``install_mode`` defaults to ``artifact``.
+    """
     required = (
         "id",
         "name",
@@ -156,9 +166,27 @@ def assert_plugin_addon_row(m: Mapping[str, Any]) -> dict[str, str]:
         "upstream_section",
         "source",
     )
+    optional = (
+        "install_mode",
+        "dll_32_path",
+        "dll_64_path",
+        "shader_root",
+        "companion_shader_paths",
+    )
     d = {k: str(m.get(k, "") if m.get(k, "") is not None else "") for k in required}
+    for k in optional:
+        d[k] = str(m.get(k, "") if m.get(k, "") is not None else "").strip()
     validate_repo_id(d["id"].strip().lower())
     d["id"] = d["id"].strip().lower()
     if d["source"] not in ("upstream", "user"):
         raise ValueError(f"invalid source: {d['source']!r}")
+    mode = (d.get("install_mode") or "").strip().lower() or "artifact"
+    if mode not in ("artifact", "repo"):
+        raise ValueError(f"invalid install_mode: {d['install_mode']!r} (expected 'artifact' or 'repo')")
+    d["install_mode"] = mode
+    if mode == "repo":
+        if not d["repository_url"].strip():
+            raise ValueError("install_mode=repo requires a non-empty repository_url")
+        if not (d["dll_32_path"].strip() or d["dll_64_path"].strip()):
+            raise ValueError("install_mode=repo requires at least one of dll_32_path, dll_64_path")
     return d

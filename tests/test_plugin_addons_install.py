@@ -128,6 +128,28 @@ def _entry(
     }
 
 
+def test_filter_catalog_installable_for_arch_excludes_repo_mode() -> None:
+    """Repo-based rows are deferred (install not implemented); filtered from Manage list."""
+    repo = {
+        "id": "repo-only",
+        "name": "R",
+        "description": "",
+        "download_url_32": "",
+        "download_url_64": "",
+        "download_url": "",
+        "repository_url": "https://github.com/a/a.git",
+        "effect_install_path": "",
+        "upstream_section": "",
+        "source": "user",
+        "install_mode": "repo",
+        "dll_32_path": "a.addon32",
+        "dll_64_path": "a.addon64",
+        "shader_root": "",
+        "companion_shader_paths": "",
+    }
+    assert filter_catalog_installable_for_arch([repo], arch="64") == []
+
+
 def test_filter_catalog_installable_for_arch() -> None:
     both = _entry("both", u32="https://x/32", u64="https://x/64")
     sixtyfour_only = _entry("64only", u64="https://x/64only")

@@ -94,6 +94,12 @@ def installability_detail(entry: dict[str, str], *, arch: str) -> tuple[bool, st
     Return ``(True, \"\")`` if :func:`resolve_download_url_for_arch` succeeds, else ``(False, reason)``.
     Used to filter catalog rows by game architecture.
     """
+    if entry.get("install_mode") == "repo":
+        return (
+            False,
+            "Repo-based plugin add-ons are not implemented yet; use artifact download URLs or wait "
+            "for a future release.",
+        )
     try:
         resolve_download_url_for_arch(entry, arch=arch)
         return True, ""
