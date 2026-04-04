@@ -5,8 +5,6 @@ from __future__ import annotations
 import configparser
 import hashlib
 import re
-from typing import Any, Mapping
-
 from reshade_shader_manager.core.repos import validate_repo_id
 
 
@@ -140,25 +138,3 @@ def parse_and_normalize_addons_ini(text: str) -> list[dict[str, str]]:
         seen.add(rid)
         out.append(row)
     return out
-
-
-def assert_plugin_addon_row(m: Mapping[str, Any]) -> dict[str, str]:
-    """Validate keys for a catalog row (upstream or user)."""
-    required = (
-        "id",
-        "name",
-        "description",
-        "download_url_32",
-        "download_url_64",
-        "download_url",
-        "repository_url",
-        "effect_install_path",
-        "upstream_section",
-        "source",
-    )
-    d = {k: str(m.get(k, "") if m.get(k, "") is not None else "") for k in required}
-    validate_repo_id(d["id"].strip().lower())
-    d["id"] = d["id"].strip().lower()
-    if d["source"] not in ("upstream", "user"):
-        raise ValueError(f"invalid source: {d['source']!r}")
-    return d

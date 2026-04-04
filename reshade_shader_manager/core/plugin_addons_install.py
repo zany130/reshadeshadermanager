@@ -53,8 +53,8 @@ def resolve_download_url_for_arch(entry: dict[str, str], *, arch: str) -> str:
     if not u32 and not u64 and not u1:
         if repo:
             raise RSMError(
-                f"Plugin add-on {name!r} has no download links in the upstream catalog "
-                f"(repository-only entry). Install from the vendor or add URLs in plugin_addons.json."
+                f"Plugin add-on {name!r} has no download links in the official catalog "
+                f"(repository-only upstream entry). Install this add-on manually from the vendor if needed."
             )
         raise RSMError(
             f"Plugin add-on {name!r} has no download links in the upstream catalog."

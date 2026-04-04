@@ -38,7 +38,7 @@ It is **inspired by** SteamTinkerLaunch (STL) behavior only; it does **not** dep
 
 | Location | Contents |
 |----------|----------|
-| `~/.config/reshade-shader-manager/` | `config.json`, `repos.json` (user shader repos only), optional `plugin_addons.json` (user plugin add-on rows), `games/<sha256-of-game_dir>.json` |
+| `~/.config/reshade-shader-manager/` | `config.json`, `repos.json` (user shader repos only), `games/<sha256-of-game_dir>.json` |
 | `~/.local/share/reshade-shader-manager/` | `repos/<id>/` (shader git clones), `addons/downloads/` (plugin add-on artifacts), `reshade/downloads/`, `reshade/extracted/<version>/`, `logs/` |
 | `~/.cache/reshade-shader-manager/` | `pcgw_repos.json`, `plugin_addons_catalog.json`, `reshade_latest_cache.json` |
 
@@ -62,17 +62,14 @@ It is **inspired by** SteamTinkerLaunch (STL) behavior only; it does **not** dep
 8. **Git concurrency (v0.1)** — `threading.Lock` in `git_sync.py` (in-process only).
 9. **PyGObject** — Declared in `pyproject.toml`; many Fedora users install with `pip install --no-deps -e .` after `dnf install python3-gobject gtk4` to avoid building PyGObject/pycairo from pip.
 
-### Plugin add-ons (v0.2 — artifact-only)
+### Plugin add-ons (official upstream only)
 
 These are ReShade **plugin** DLLs (e.g. `.addon32` / `.addon64`), not the ReShade installer “addon” EXE variant.
 
-- **Model:** **Artifact-only.** RSM downloads by HTTP(S) URL (per-arch and/or single URL), caches under `~/.local/share/.../addons/downloads/`, and may extract ZIPs. There is **no** git clone and **no** install path keyed off a bare `repository_url`.
-- **Upstream:** Official rows come from cached **Addons.ini** (`plugin_addons_catalog.json` after fetch/parse).
-- **User rows:** Optional `plugin_addons.json` merges with upstream (same field shape); user wins on `id` collision.
-- **`repository_url`:** Present on catalog rows for **metadata** (e.g. stable id hashing, upstream reference). It is **not** an install mechanism; do not add repo-based or `git pull` flows for plugin add-ons.
-- **Git** remains for **shader repos** only (`repos/<id>/` and “Update local clones”).
-
-Future UI or tooling for “add a custom plugin add-on” must stay within this model (URLs / ZIPs only).
+- **Source of truth:** **Only** the official **`Addons.ini`** from the reshade-shaders repo (`https://raw.githubusercontent.com/crosire/reshade-shaders/list/Addons.ini`), fetched and cached as `plugin_addons_catalog.json`. There is **no** `plugin_addons.json`, no user-defined add-on list, and no merge with custom entries.
+- **Install:** **Artifact-only** — HTTP(S) download by URL from that catalog, cache under `~/.local/share/.../addons/downloads/`, optional ZIP extract. No git clone for plugin add-ons; no custom add-on UI.
+- **`repository_url`:** On upstream rows, **metadata only** (stable ids, reference). Not an install mechanism.
+- **Git** applies only to **shader repos** (`repos/<id>/`, “Update local clones”).
 
 ---
 
@@ -98,8 +95,7 @@ reshadeshadermanager/
 │   │   ├── targets.py         # GraphicsAPI, PE arch, proxy DLL names, DX8 wrapper constant
 │   │   ├── d3d8to9.py         # Download/cache crosire d3d8.dll, PE arch check
 │   │   ├── plugin_addons_parse.py   # Addons.ini → stable ids + normalized rows
-│   │   ├── plugin_addons_catalog.py # Fetch/cache upstream list (XDG cache)
-│   │   ├── plugin_addons_user.py    # plugin_addons.json + merged catalog
+│   │   ├── plugin_addons_catalog.py # Fetch/cache official Addons.ini (XDG cache)
 │   │   ├── plugin_addons_install.py # copy DLLs, ZIP fail-closed, manifest updates
 │   │   ├── ini.py             # ReShade.ini [GENERAL] search paths only
 │   │   ├── reshade.py         # GitHub tags, download, zip extract, install/remove/check
@@ -148,7 +144,7 @@ reshadeshadermanager/
 
 ## Current progress (as of this document)
 
-- **Backend:** ReShade install/remove/check, INI search paths, PCGW fetch/cache, `merged_catalog`, **plugin add-on** upstream `Addons.ini` parse (stable ids) + `plugin_addons_catalog.json` cache + `plugin_addons.json` merge, `apply_shader_projection` (full rebuild on Apply; `git_pull=False` on Apply), non-standard repo layouts (nested dirs + file fallback), safe symlink removal under `reshade-shaders/`. Tests: `pytest tests/` (fake zip, mocked git; optional live PCGW with `RSM_NETWORK_TEST=1`).
+- **Backend:** ReShade install/remove/check, INI search paths, PCGW fetch/cache, `merged_catalog`, **plugin add-ons** from official cached **`Addons.ini`** only (`plugin_addons_catalog.json`), `apply_shader_projection` (full rebuild on Apply; `git_pull=False` on Apply), non-standard repo layouts (nested dirs + file fallback), safe symlink removal under `reshade-shaders/`. Tests: `pytest tests/` (fake zip, mocked git; optional live PCGW with `RSM_NETWORK_TEST=1`).
 - **GTK UI:** Game dir + optional exe, arch, API/variant/version, Install, **Update / Reinstall Latest** (resolve upstream `latest` at click time, same API/variant), Remove/Check, Refresh catalog, **Update local clones** (`git pull` for existing clones in the current catalog), **Add repository…** (user `repos.json`), Manage shaders (checklist + Apply), **Manage plugin add-ons…** (DLL copies + manifest), log panel, **window geometry** persistence (`ui_state.json`).
 - **README / packaging:** See [README.md](README.md) and [packaging/README.md](packaging/README.md) for install and distribution notes.
 - **Known environment:** `latest` resolved via GitHub tags (not `releases/latest`); system `python3-gobject` + `pip install --no-deps -e .` avoids pip-building PyGObject without cairo.
@@ -171,7 +167,6 @@ Aligned with [PROJECT_SPEC.md](PROJECT_SPEC.md) deferrals and non-goals:
 - **CLI** for scripting installs and shader projection.
 - **DirectX 8 x64 wrapper** if upstream ships a 64-bit `d3d8.dll` (today: 32-bit only).
 - **Multi-profile per game** (explicitly a non-goal for v0.1).
-- **Plugin add-ons (v0.2 UI):** e.g. “Add plugin add-on…” to edit `plugin_addons.json` using **download URLs only** (artifact model). No git-backed add-on installs.
 
 ---
 

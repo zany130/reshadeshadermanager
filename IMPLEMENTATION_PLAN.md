@@ -71,10 +71,10 @@ This document is the **authoritative implementation plan** for *reshade-shader-m
 6. **Git concurrency**  
    - v0.1: **simple in-process serialization** (a module-level `threading.Lock` around `git clone` / `git pull` in `git_sync.py`). No file locks or multi-process coordination yet.
 
-7. **Plugin add-ons (v0.2+)**  
-   - **Artifact-only:** install path is HTTP download / ZIP extract + copy into the game tree; optional companion symlinks from extracted archives.  
-   - **Upstream** list from cached **Addons.ini**; optional user rows in **`plugin_addons.json`**.  
-   - **`repository_url`** on catalog rows is **metadata only** (not a clone/install source). **Do not** add git clone or `git pull` for plugin add-on repos.
+7. **Plugin add-ons**  
+   - **Official upstream only:** catalog from **`Addons.ini`** at `https://raw.githubusercontent.com/crosire/reshade-shaders/list/Addons.ini`, fetched and cached; **no** `plugin_addons.json`, **no** user-defined add-on entries, **no** merge.  
+   - **Artifact-only install:** HTTP download / ZIP extract + copy into the game tree; optional companion symlinks from extracted archives.  
+   - **`repository_url`** on upstream rows is **metadata only** (not a clone/install source). **Do not** add git clone, `git pull`, or custom add-on sources for plugin add-ons.
 
 ### Implementation note (Remove ReShade, locked)
 

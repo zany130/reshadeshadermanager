@@ -80,10 +80,6 @@ class RsmPaths:
     def plugin_addons_cache_path(self) -> Path:
         return self.cache_dir / "plugin_addons_catalog.json"
 
-    def plugin_addons_json(self) -> Path:
-        """User-defined plugin add-ons (not upstream ``Addons.ini``)."""
-        return self.config_dir / "plugin_addons.json"
-
     def plugin_addon_artifact_dir(self, addon_id: str, download_url: str) -> Path:
         """Per-URL download/extract cache for a plugin add-on (under XDG data)."""
         safe_id = re.sub(r"[^a-z0-9_-]+", "_", addon_id.strip().lower())[:48].strip("_") or "addon"

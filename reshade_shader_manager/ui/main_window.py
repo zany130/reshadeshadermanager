@@ -20,7 +20,6 @@ from reshade_shader_manager.core.paths import get_paths
 from reshade_shader_manager.core.git_sync import pull_existing_clones_for_catalog
 from reshade_shader_manager.core.pcgw import get_pcgw_repos
 from reshade_shader_manager.core.plugin_addons_catalog import get_upstream_plugin_addons
-from reshade_shader_manager.core.plugin_addons_user import merged_plugin_addon_catalog
 from reshade_shader_manager.core.repos import merged_catalog
 from reshade_shader_manager.core.reshade import check_reshade, install_reshade, remove_reshade_binaries
 from reshade_shader_manager.core.targets import detect_game_arch
@@ -229,7 +228,7 @@ class MainWindow(Gtk.ApplicationWindow):
         row.set_hexpand(True)
         b = Gtk.Button(label="Manage plugin add-ons…")
         b.set_tooltip_text(
-            "Copy official or user-listed ReShade plugin DLLs into the game folder "
+            "Copy official upstream (Addons.ini) ReShade plugin DLLs into the game folder "
             "(not the ReShade installer “addon” variant)."
         )
         b.connect("clicked", self._on_manage_plugin_addons)
@@ -524,12 +523,11 @@ class MainWindow(Gtk.ApplicationWindow):
                 force_refresh=True,
             )
             shader_cat = merged_catalog(self._paths, pcgw)
-            upstream = get_upstream_plugin_addons(
+            plugin_cat = get_upstream_plugin_addons(
                 self._paths,
                 ttl_hours=self._config.plugin_addons_catalog_ttl_hours,
                 force_refresh=True,
             )
-            plugin_cat = merged_plugin_addon_catalog(self._paths, upstream)
             return shader_cat, plugin_cat
 
         def ok(pair: tuple[list[dict[str, str]], list[dict[str, str]]]) -> None:
@@ -537,7 +535,7 @@ class MainWindow(Gtk.ApplicationWindow):
             self._catalog = cat
             self._plugin_addon_catalog = plugin_cat
             log.info(
-                "Catalog loaded: %d shader repos; %d plugin add-ons (upstream + user)",
+                "Catalog loaded: %d shader repos; %d plugin add-ons (official Addons.ini)",
                 len(cat),
                 len(plugin_cat),
             )
@@ -580,12 +578,11 @@ class MainWindow(Gtk.ApplicationWindow):
                     force_refresh=False,
                 )
                 self._catalog = merged_catalog(self._paths, pcgw)
-                up = get_upstream_plugin_addons(
+                self._plugin_addon_catalog = get_upstream_plugin_addons(
                     self._paths,
                     ttl_hours=self._config.plugin_addons_catalog_ttl_hours,
                     force_refresh=False,
                 )
-                self._plugin_addon_catalog = merged_plugin_addon_catalog(self._paths, up)
                 log.info(
                     "Catalog reloaded after adding user repo (%d shader repos, %d plugin add-ons)",
                     len(self._catalog),
