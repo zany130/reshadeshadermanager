@@ -17,6 +17,7 @@ from reshade_shader_manager.core.manifest import (
     save_game_manifest,
 )
 from reshade_shader_manager.core.paths import get_paths
+from reshade_shader_manager.core.recent_games import list_recent_games
 from reshade_shader_manager.core.git_sync import pull_existing_clones_for_catalog
 from reshade_shader_manager.core.pcgw import get_pcgw_repos
 from reshade_shader_manager.core.plugin_addons_catalog import get_upstream_plugin_addons
@@ -71,6 +72,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self._exe_path: Path | None = None
         self._arch_display = "—"
         self._arch_value = ""
+        self._recent_paths: list[Path] = []
 
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
 
@@ -113,6 +115,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
         self._set_catalog_dependent_sensitive(False)
         GLib.idle_add(self._schedule_initial_catalog_hydration)
+        GLib.idle_add(self._idle_refresh_recent_games)
 
         self.connect("close-request", self._on_close_request)
         if self._pending_maximize:
@@ -126,16 +129,38 @@ class MainWindow(Gtk.ApplicationWindow):
             GLib.idle_add(_max_once)
 
     def _build_target_section(self) -> Gtk.Widget:
-        grid = Gtk.Grid(column_spacing=10, row_spacing=8)
-        grid.set_hexpand(True)
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        outer.set_hexpand(True)
 
+        top = Gtk.Grid(column_spacing=10, row_spacing=8)
+        top.set_hexpand(True)
         self._game_label = Gtk.Label(label="(not set)", xalign=0.0, hexpand=True)
         self._game_label.set_ellipsize(Pango.EllipsizeMode.END)
         btn_dir = Gtk.Button(label="Game directory…")
         btn_dir.connect("clicked", self._on_pick_game_dir)
-        grid.attach(self._game_label, 0, 0, 1, 1)
-        grid.attach(btn_dir, 1, 0, 1, 1)
+        top.attach(self._game_label, 0, 0, 1, 1)
+        top.attach(btn_dir, 1, 0, 1, 1)
+        outer.append(top)
 
+        recent_hdr = Gtk.Label(label="Recent games", xalign=0.0)
+        recent_hdr.add_css_class("title-4")
+        outer.append(recent_hdr)
+
+        self._recent_listbox = Gtk.ListBox()
+        self._recent_listbox.set_activate_on_single_click(True)
+        self._recent_listbox.set_hexpand(True)
+        self._recent_listbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        self._recent_listbox.connect("row-activated", self._on_recent_row_activated)
+        outer.append(self._recent_listbox)
+
+        self._recent_empty = Gtk.Label(label="No saved games yet.", xalign=0.0)
+        self._recent_empty.set_opacity(0.65)
+        self._recent_listbox.set_visible(False)
+        self._recent_empty.set_visible(True)
+        outer.append(self._recent_empty)
+
+        rest = Gtk.Grid(column_spacing=10, row_spacing=8)
+        rest.set_hexpand(True)
         self._exe_label = Gtk.Label(label="(none)", xalign=0.0, hexpand=True)
         self._exe_label.set_ellipsize(Pango.EllipsizeMode.END)
         btn_exe = Gtk.Button(label="Game executable…")
@@ -146,12 +171,54 @@ class MainWindow(Gtk.ApplicationWindow):
         exe_row.append(self._exe_label)
         exe_row.append(btn_exe)
         exe_row.append(btn_clear)
-        grid.attach(exe_row, 0, 1, 2, 1)
+        rest.attach(exe_row, 0, 0, 2, 1)
 
         self._arch_label = Gtk.Label(label="Architecture: —", xalign=0.0)
-        grid.attach(self._arch_label, 0, 2, 2, 1)
+        rest.attach(self._arch_label, 0, 1, 2, 1)
+        outer.append(rest)
 
-        return grid
+        return outer
+
+    def _idle_refresh_recent_games(self) -> bool:
+        self._refresh_recent_games()
+        return False
+
+    def _refresh_recent_games(self) -> None:
+        entries = list_recent_games(self._paths)
+        self._recent_paths = [e.game_dir for e in entries]
+        self._recent_listbox.remove_all()
+        if not entries:
+            self._recent_listbox.set_visible(False)
+            self._recent_empty.set_visible(True)
+            return
+        self._recent_listbox.set_visible(True)
+        self._recent_empty.set_visible(False)
+        for entry in entries:
+            row = Gtk.ListBoxRow()
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+            t1 = Gtk.Label(label=entry.display_name, xalign=0.0, hexpand=True)
+            t1.set_ellipsize(Pango.EllipsizeMode.END)
+            t2 = Gtk.Label(label=entry.path_short, xalign=0.0, hexpand=True)
+            t2.set_ellipsize(Pango.EllipsizeMode.END)
+            t2.set_opacity(0.75)
+            box.append(t1)
+            box.append(t2)
+            row.set_child(box)
+            row.set_tooltip_text(str(entry.game_dir))
+            self._recent_listbox.append(row)
+
+    def _on_recent_row_activated(self, _listbox: Gtk.ListBox, row: Gtk.ListBoxRow) -> None:
+        idx = row.get_index()
+        if idx < 0 or idx >= len(self._recent_paths):
+            return
+        path = self._recent_paths[idx]
+        if not path.is_dir():
+            self._show_error(
+                "That game folder no longer exists or is not accessible:\n" + str(path)
+            )
+            return
+        self._apply_game_directory(path)
+        self._refresh_recent_games()
 
     def _build_reshade_section(self) -> Gtk.Widget:
         grid = Gtk.Grid(column_spacing=10, row_spacing=8)
@@ -345,6 +412,7 @@ class MainWindow(Gtk.ApplicationWindow):
             self._version_entry.set_text(self._config.default_reshade_version)
         self._refresh_arch()
         self._persist_target_metadata()
+        self._refresh_recent_games()
 
     def _refresh_arch(self) -> None:
         if not self._game_dir or not self._game_dir.is_dir():

@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.4.0
+
+### Added
+
+- **Recent games:** The Target section lists up to **6** previously saved games from `~/.config/.../games/*.json`, ordered by manifest **file modification time** (newest first). Invalid files are skipped while scanning so the list can still fill with valid entries; duplicate installs are deduplicated by canonical game directory (newest manifest file wins). Each row shows a short display name (from `game_exe` when set, otherwise the game folder name) and an optional shortened path. Click a row to select that game the same way as **Game directory…**. If the folder no longer exists, a clear error is shown. **No new manifest fields or schema changes.**
+
+### Notes
+
+- Version 0.4 is a usability-focused release: quicker game switching without extra configuration. Shader repositories, plugin add-ons (Addons.ini), ReShade install flows, and manifest formats from v0.3 are unchanged aside from this UI addition.
+
 ## 0.3.0
 
 ### Added

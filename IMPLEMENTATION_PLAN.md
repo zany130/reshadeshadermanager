@@ -126,7 +126,8 @@ Tests: `tests/core/...` (recommended alongside steps below).
 | `git_sync.py` | `clone_or_pull(data_dir/repos/<id>, url)`. |
 | `link_farm.py` | For enable: ensure `Shaders/` and `Textures/` exist under game `reshade-shaders/`; for each repo, if `<data>/repos/<id>/Shaders` exists, symlink `game/.../Shaders/<id>` → absolute `.../Shaders`; same for `Textures`; record paths under `symlinks_by_repo_id[id]`. For disable: remove only paths listed for that id; prune empty dirs if safe. Collision: target exists and is not our symlink → log + skip. **No per-file symlinks** per decision §0.1. |
 | `main.py` | Application entry; dependency wiring. |
-| `main_window.py` | Target selection, ReShade actions, log panel, **startup catalog hydration** (cache-first; gate Manage shaders / Manage plugin add-ons / Update clones until ready), **Refresh catalog** for forced network refresh, **graphics API combo including dx8 (disabled or “not in v0.1” messaging)**. |
+| `recent_games.py` | List recent manifests by file mtime (walk until 6 valid, dedupe `game_dir`); display names from `game_exe` / directory basename. **No GTK.** |
+| `main_window.py` | Target selection, **Recent games** list (v0.4), ReShade actions, log panel, **startup catalog hydration** (cache-first; gate Manage shaders / Manage plugin add-ons / Update clones until ready), **Refresh catalog** for forced network refresh, **graphics API combo including dx8 (disabled or “not in v0.1” messaging)**. |
 | `shader_dialog.py` | Merged catalog checklist; apply → `git_sync` + `link_farm` + manifest. |
 | `log_view.py` | Log sink for UI. |
 
@@ -277,6 +278,13 @@ Per **§0b.1**: remove **only** files in `installed_reshade_files`; do **not** r
 1. After the main window is shown, load PCGW + merged shader catalog + official plugin add-on catalog **once** in a worker thread with **`force_refresh=False`** (cache/TTL semantics unchanged).  
 2. Until that completes successfully, **Manage shaders…**, **Manage plugin add-ons…**, and **Update local clones** stay **disabled**.  
 3. **Refresh catalog** uses **`force_refresh=True`** (explicit user-driven network refresh). Failure on initial hydration surfaces an error and suggests **Refresh catalog** to retry.
+
+### Recent games (UI, v0.4)
+
+1. **No manifest schema change.** Recency is inferred from each manifest file’s **mtime** on disk (not a dedicated timestamp field).  
+2. Sort all `games/*.json` by mtime descending; walk in order and collect up to **6** valid entries (skip invalid JSON or missing `game_dir`); **deduplicate** by canonical `game_dir`, keeping the **newest file** per install.  
+3. **Main window** shows a short **Recent games** list under the game-directory row; activating a row calls the same path as choosing a folder. If `game_dir` is not an existing directory, show a clear error.  
+4. Implementation: [`recent_games.py`](reshade_shader_manager/core/recent_games.py) (`list_recent_games`); UI in [`main_window.py`](reshade_shader_manager/ui/main_window.py).
 
 ### Enable repo
 

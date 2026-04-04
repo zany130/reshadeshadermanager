@@ -79,7 +79,7 @@ These are ReShade **plugin** DLLs (e.g. `.addon32` / `.addon64`), not the ReShad
 reshadeshadermanager/
 ├── CONTEXT.md                 # This file (AI/human handoff)
 ├── README.md                  # GitHub quickstart
-├── CHANGELOG.md               # Release notes (e.g. v0.3.0)
+├── CHANGELOG.md               # Release notes (e.g. v0.4.0)
 ├── PROJECT_SPEC.md            # Product goals, non-goals, data examples
 ├── IMPLEMENTATION_PLAN.md     # Locked decisions + validation notes
 ├── pyproject.toml             # hatchling, deps, entry point, pytest
@@ -104,12 +104,13 @@ reshadeshadermanager/
 │   │   ├── pcgw.py            # MediaWiki API, parse HTML → repo list, cache
 │   │   ├── git_sync.py        # clone/pull + lock; pull_existing_clones_for_catalog
 │   │   ├── ui_state.py        # window geometry JSON (no GTK)
+│   │   ├── recent_games.py    # Recent games list (mtime scan of games/*.json)
 │   │   └── link_farm.py       # apply_shader_projection, enable/disable, layouts
 │   └── ui/
 │       ├── __init__.py
 │       ├── log_view.py        # LogPanel, GtkLogHandler, setup_gui_logging
 │       ├── error_format.py    # user-facing exception strings
-│       ├── main_window.py     # Target, ReShade, shader buttons, workers
+│       ├── main_window.py     # Target, Recent games, ReShade, shader buttons, workers
 │       ├── shader_dialog.py   # ShaderRepoWindow checklist + apply
 │       ├── plugin_addon_dialog.py  # Plugin add-on checklist + Apply (DLL copies)
 │       └── add_repo_dialog.py # Add user repo → repos.json
@@ -118,6 +119,7 @@ reshadeshadermanager/
     ├── test_paths.py
     ├── test_ini.py
     ├── test_manifest.py
+    ├── test_recent_games.py
     ├── test_ui_state.py
     ├── test_reshade_version.py
     ├── test_git_sync.py
@@ -138,7 +140,8 @@ reshadeshadermanager/
 - **No flattening** shader repos; **no renaming** shader files.
 - **STL = reference only** — do not port shell/YAD patterns as architecture.
 - **Backend/UI split** — Keep core importable without GTK; avoid heavy logic in UI files.
-- **Release v0.3 (current)** — Startup **catalog hydration** (shader + plugin add-on catalogs from cache/TTL in a background worker; **Manage shaders…**, **Manage plugin add-ons…**, and **Update local clones** stay insensitive until load completes). **Refresh catalog** remains the explicit **force network refresh**. Per-game manifests use human-readable **`games/{slug}-{fp8}.json`** with lazy migration from legacy `games/{sha256}.json` on load/save only (no full `games/` scan at startup).
+- **Release v0.4 (current)** — **Recent games** in the Target section: up to **6** entries from `games/*.json`, ordered by manifest **file mtime** (newest first), skipping invalid files and deduplicating by canonical `game_dir`; no new manifest fields. Clicking a row selects that game like the folder picker (missing folders show a clear error).
+- **v0.3** — Startup **catalog hydration**; human-readable **`games/{slug}-{fp8}.json`** manifests with lazy legacy migration.
 - **v0.2** — Official **Addons.ini**–only plugin add-ons, ReShade + shader flows, GTK UI. **Not** in scope: CLI, user-defined plugin add-on catalogs, multi-profile per game.
 - **Deferred (post–v0.2)** — CLI per [PROJECT_SPEC.md](PROJECT_SPEC.md); multi-profile per game remains a non-goal until explicitly planned. ReShade updates: use **Update / Reinstall Latest** or explicit version; no RSM background version notifier.
 
@@ -147,7 +150,7 @@ reshadeshadermanager/
 ## Current progress (as of this document)
 
 - **Backend:** ReShade install/remove/check, INI search paths, PCGW fetch/cache, `merged_catalog`, **plugin add-ons** from official cached **`Addons.ini`** only (`plugin_addons_catalog.json`), `apply_shader_projection` (full rebuild on Apply; `git_pull=False` on Apply), non-standard repo layouts (nested dirs + file fallback), safe symlink removal under `reshade-shaders/`. Tests: `pytest tests/` (fake zip, mocked git; optional live PCGW with `RSM_NETWORK_TEST=1`).
-- **GTK UI:** Game dir + optional exe, arch, API/variant/version, Install, **Update / Reinstall Latest** (resolve upstream `latest` at click time, same API/variant), Remove/Check, **startup catalog hydration** + Refresh catalog (forced refresh), **Update local clones** (`git pull` for existing clones in the current catalog), **Add repository…** (user `repos.json`), Manage shaders (checklist + Apply), **Manage plugin add-ons…** (DLL copies + manifest), log panel, **window geometry** persistence (`ui_state.json`).
+- **GTK UI:** Game dir + optional exe, **Recent games** list (v0.4), arch, API/variant/version, Install, **Update / Reinstall Latest** (resolve upstream `latest` at click time, same API/variant), Remove/Check, **startup catalog hydration** + Refresh catalog (forced refresh), **Update local clones** (`git pull` for existing clones in the current catalog), **Add repository…** (user `repos.json`), Manage shaders (checklist + Apply), **Manage plugin add-ons…** (DLL copies + manifest), log panel, **window geometry** persistence (`ui_state.json`).
 - **README / packaging:** See [README.md](README.md) and [packaging/README.md](packaging/README.md) for install and distribution notes.
 - **Known environment:** `latest` resolved via GitHub tags (not `releases/latest`); system `python3-gobject` + `pip install --no-deps -e .` avoids pip-building PyGObject without cairo.
 
