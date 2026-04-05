@@ -10,7 +10,6 @@ from typing import Any, Mapping
 
 from reshade_shader_manager.core.paths import (
     RsmPaths,
-    candidate_game_manifest_paths,
     canonical_game_dir_str,
     game_dir_fingerprint8,
     legacy_game_manifest_path,
@@ -20,6 +19,11 @@ from reshade_shader_manager.core.paths import (
 log = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 2
+
+_DUPLICATE_MANIFEST_WARNING = (
+    "Duplicate manifests detected for the same game after canonicalization. "
+    "Using canonical config and leaving old file for manual cleanup."
+)
 
 # v0.2+: plugin add-ons (DLLs / optional companion shaders) — not ReShade's installer "addon" variant
 # (see ``reshade_variant`` / ``VALID_VARIANTS``).
@@ -144,34 +148,19 @@ def _write_manifest_atomic(paths: RsmPaths, manifest: GameManifest, path: Path) 
     tmp.replace(path)
 
 
-def _migrate_legacy_manifest(
-    paths: RsmPaths,
-    manifest: GameManifest,
-    legacy_path: Path,
-) -> None:
-    target = new_manifest_path_for_game(paths, manifest.game_dir, manifest.game_exe)
-    if legacy_path.resolve() == target.resolve():
-        return
-    _write_manifest_atomic(paths, manifest, target)
-    try:
-        legacy_path.unlink()
-    except OSError as e:
-        log.warning("Could not remove legacy manifest %s: %s", legacy_path, e)
-
-
-def load_game_manifest(
-    paths: RsmPaths,
-    game_dir: str | Path,
-    game_exe: str | None = None,
-) -> GameManifest | None:
+def _scan_manifest_entries_for_canonical_dir(
+    paths: RsmPaths, cgd: str
+) -> list[tuple[Path, GameManifest, str]]:
     """
-    Load manifest for ``game_dir``, trying human-readable paths and legacy hash name.
+    All valid manifest files whose stored ``game_dir`` canonicalizes to ``cgd``.
 
-    Lazy migration: if the only match is the legacy ``{sha256}.json``, load and migrate
-    to ``{slug}-{fp8}.json`` after a successful write to the new path.
+    Returns ``(path, manifest, raw_game_dir_from_json)`` sorted by path string.
     """
-    cgd = canonical_game_dir_str(game_dir)
-    for path in candidate_game_manifest_paths(paths, game_dir, game_exe):
+    games = paths.games_dir()
+    if not games.is_dir():
+        return []
+    entries: list[tuple[Path, GameManifest, str]] = []
+    for path in sorted(games.glob("*.json"), key=lambda p: str(p)):
         if not path.is_file():
             continue
         try:
@@ -182,12 +171,12 @@ def load_game_manifest(
             continue
         if not isinstance(data, dict):
             continue
+        raw_gd = str(data.get("game_dir", ""))
         try:
-            file_gd = canonical_game_dir_str(data.get("game_dir", ""))
+            file_gd = canonical_game_dir_str(raw_gd)
         except OSError:
             continue
         if file_gd != cgd:
-            log.warning("Skipping manifest %s: game_dir does not match this game", path)
             continue
         try:
             m = GameManifest.from_mapping(data)
@@ -195,17 +184,65 @@ def load_game_manifest(
         except ValueError as e:
             log.warning("Invalid manifest %s: %s", path, e)
             continue
+        m.game_dir = file_gd
+        entries.append((path, m, raw_gd))
+    return entries
 
-        try:
-            m.game_dir = canonical_game_dir_str(m.game_dir)
-        except OSError as e:
-            log.warning("Skipping manifest %s: could not canonicalize game_dir: %s", path, e)
-            continue
 
-        if path.resolve() == legacy_game_manifest_path(paths, game_dir).resolve():
-            _migrate_legacy_manifest(paths, m, path)
+def load_game_manifest(
+    paths: RsmPaths,
+    game_dir: str | Path,
+    game_exe: str | None = None,
+) -> GameManifest | None:
+    """
+    Load manifest for ``game_dir`` by scanning ``games/*.json`` for matching canonical
+    ``game_dir``.
+
+    Lazily migrates stale filenames (e.g. pre-v1.0 hash mismatch vs canonical path) or
+    legacy ``{sha256}.json`` to the canonical ``{slug}-{fp8}.json`` when exactly one
+    match exists and the canonical target path is free.
+    """
+    cgd = canonical_game_dir_str(game_dir)
+    target = new_manifest_path_for_game(paths, cgd, game_exe)
+    entries = _scan_manifest_entries_for_canonical_dir(paths, cgd)
+    if not entries:
+        return None
+
+    target_r = target.resolve()
+    by_res: dict[Path, tuple[Path, GameManifest, str]] = {}
+    for path, m, raw in entries:
+        by_res[path.resolve()] = (path, m, raw)
+
+    if target_r in by_res:
+        _path, m, _raw = by_res[target_r]
+        if len(entries) > 1:
+            log.warning("%s", _DUPLICATE_MANIFEST_WARNING)
         return m
-    return None
+
+    if target.is_file():
+        log.warning("%s", _DUPLICATE_MANIFEST_WARNING)
+        _path, m, _raw = min(entries, key=lambda e: str(e[0]))
+        return m
+
+    if len(entries) == 1:
+        path, m, raw_gd = entries[0]
+        if path.resolve() == target_r:
+            return m
+        try:
+            _write_manifest_atomic(paths, m, target)
+        except OSError as e:
+            log.warning("Could not migrate manifest to canonical path %s: %s", target, e)
+            return m
+        try:
+            path.unlink()
+        except OSError as e:
+            log.warning("Could not remove old manifest %s after migration: %s", path, e)
+        log.info("Migrated config to canonical path: %r → %r", raw_gd, cgd)
+        return m
+
+    log.warning("%s", _DUPLICATE_MANIFEST_WARNING)
+    _path, m, _raw = min(entries, key=lambda e: str(e[0]))
+    return m
 
 
 def save_game_manifest(paths: RsmPaths, manifest: GameManifest) -> None:

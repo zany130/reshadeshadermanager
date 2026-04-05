@@ -417,7 +417,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG, format="%(levelname)s %(message)s")
     else:
-        logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
+        # INFO so manifest migration and similar operational messages reach stderr.
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
     try:
         return _dispatch(args)

@@ -1,7 +1,10 @@
 """Game manifest roundtrip."""
 
 import json
+import logging
 from pathlib import Path
+
+import pytest
 
 from reshade_shader_manager.core.manifest import (
     SCHEMA_VERSION,
@@ -106,3 +109,112 @@ def test_manifest_load_schema_v1_migrates_to_v2(tmp_path: Path, monkeypatch) -> 
     assert data["enabled_plugin_addon_ids"] == []
     assert data["plugin_addon_root_copies"] == {}
     assert data["plugin_addon_companion_symlinks"] == {}
+
+
+def _minimal_manifest_dict(game_dir: str, **extra: object) -> dict:
+    d: dict = {
+        "schema_version": SCHEMA_VERSION,
+        "game_dir": game_dir,
+        "game_exe": None,
+        "graphics_api": "dx11",
+        "reshade_version": "",
+        "reshade_variant": "standard",
+        "reshade_arch": "64",
+        "enabled_repo_ids": [],
+        "installed_reshade_files": [],
+        "symlinks_by_repo_id": {},
+        "enabled_plugin_addon_ids": [],
+        "plugin_addon_root_copies": {},
+        "plugin_addon_companion_symlinks": {},
+    }
+    d.update(extra)
+    return d
+
+
+def test_migrate_stale_manifest_filename_preserves_settings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Pre-v1.0-style file at a non-canonical name moves to {slug}-{fp8}.json."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    paths = RsmPaths.from_env()
+    paths.ensure_layout()
+    game = (tmp_path / "wine" / "game").resolve()
+    game.mkdir(parents=True)
+    target = new_manifest_path_for_game(paths, game, None)
+    stale = paths.games_dir() / "stale-pre-canonical.json"
+    raw_dir = str(game)
+    stale.write_text(
+        json.dumps(
+            _minimal_manifest_dict(raw_dir, enabled_repo_ids=["keep-me"], reshade_version="5.0.0")
+        ),
+        encoding="utf-8",
+    )
+    assert not target.is_file()
+
+    with caplog.at_level(logging.INFO):
+        m = load_game_manifest(paths, game)
+    assert m is not None
+    assert m.enabled_repo_ids == ["keep-me"]
+    assert m.reshade_version == "5.0.0"
+    assert m.game_dir == canonical_game_dir_str(game)
+    assert target.is_file()
+    assert not stale.is_file()
+    assert "Migrated config to canonical path:" in caplog.text
+
+
+def test_duplicate_manifests_warn_and_prefer_canonical_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    paths = RsmPaths.from_env()
+    paths.ensure_layout()
+    game = (tmp_path / "g2").resolve()
+    game.mkdir()
+    cgd = canonical_game_dir_str(game)
+    target = new_manifest_path_for_game(paths, cgd, None)
+    fp8 = target.name.rsplit("-", 1)[-1].removesuffix(".json")
+    other = paths.games_dir() / f"other-{fp8}.json"
+    target.write_text(
+        json.dumps(_minimal_manifest_dict(cgd, enabled_repo_ids=["canonical"])),
+        encoding="utf-8",
+    )
+    other.write_text(
+        json.dumps(_minimal_manifest_dict(cgd, enabled_repo_ids=["stale"])),
+        encoding="utf-8",
+    )
+
+    with caplog.at_level(logging.WARNING):
+        m = load_game_manifest(paths, game)
+    assert m is not None
+    assert m.enabled_repo_ids == ["canonical"]
+    assert target.is_file()
+    assert other.is_file()
+    assert "Duplicate manifests detected for the same game after canonicalization" in caplog.text
+
+
+def test_manifest_conflict_when_canonical_path_occupied_by_other_game(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Canonical filename exists but holds a different game_dir; do not overwrite."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    paths = RsmPaths.from_env()
+    paths.ensure_layout()
+    game_a = (tmp_path / "a").resolve()
+    game_b = (tmp_path / "b").resolve()
+    game_a.mkdir()
+    game_b.mkdir()
+    target_for_a = new_manifest_path_for_game(paths, canonical_game_dir_str(game_a), None)
+    target_for_a.write_text(
+        json.dumps(_minimal_manifest_dict(str(game_b))),
+        encoding="utf-8",
+    )
+    stale = paths.games_dir() / "only-a.json"
+    stale.write_text(json.dumps(_minimal_manifest_dict(str(game_a))), encoding="utf-8")
+
+    with caplog.at_level(logging.WARNING):
+        m = load_game_manifest(paths, game_a)
+    assert m is not None
+    assert canonical_game_dir_str(m.game_dir) == canonical_game_dir_str(game_a)
+    assert stale.is_file()
+    assert target_for_a.is_file()
+    assert "Duplicate manifests detected" in caplog.text
