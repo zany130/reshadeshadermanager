@@ -2,12 +2,6 @@
 
 All notable changes to this project are documented in this file.
 
-## 1.0.1
-
-### Added
-
-- **ReShade / Wine:** Ensure `d3dcompiler_47.dll` is present when missing by downloading from the Lutris tools mirror (`https://lutris.net/files/tools/dll/d3dcompiler_47.dll`, same stable URL as SteamTinkerLaunch), caching under XDG data, and copying next to the game. The ReShade installer does not ship this DLL. Does not overwrite an existing file. When RSM installs the DLL, it is listed in `installed_reshade_files` (Linux/Wine layout) and removed with other ReShade binaries; a file that was already in the game directory is left untracked.
-
 ## 1.0.0
 
 First stable release. High-level themes (see earlier entries for incremental detail):
@@ -18,6 +12,7 @@ First stable release. High-level themes (see earlier entries for incremental det
 - **GTK:** Shader and add-on tables with search and sorting; **Recent games** list.
 - **Packaging:** AppImage workflow, icons, and desktop integration polish.
 - **Stabilization:** Polishing, regression tests, removal of active **`ReShade.ini`** management (ReShade owns its config); documentation and manual QA alignment for release.
+- **ReShade / Wine:** Ensure `d3dcompiler_47.dll` when missing by downloading from the Lutris tools mirror (`https://lutris.net/files/tools/dll/d3dcompiler_47.dll`, same stable URL as SteamTinkerLaunch), caching under XDG data, and copying next to the game. The ReShade installer does not ship this DLL. Does not overwrite an existing file. When RSM installs the DLL, it is listed in `installed_reshade_files` (Linux/Wine layout) and removed with other ReShade binaries; a file that was already in the game directory is left untracked.
 
 ## 0.8.0
 
