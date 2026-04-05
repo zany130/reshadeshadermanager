@@ -6,7 +6,7 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
-- **Manage shaders…** and **Manage plugin add-ons…** use a **searchable table** (`Gtk.ColumnView`) with columns **Name**, **Author**, **Description**, and **Source**, default **Name** sort, and a **search bar** (case-insensitive substring over those fields). Enable/disable toggles and **Apply** behavior are unchanged; selection state is kept when filtering rows.
+- **Manage shaders…** and **Manage plugin add-ons…** use a **searchable table** (`Gtk.ColumnView`) with columns **Enabled**, **Name**, **Author**, **Description**, and **Source**, default **Name** sort, and a **search bar** (case-insensitive substring over those fields). **Column headers** sort the table (`Gtk.SortListModel` / `Gtk.StringSorter`); click a header to sort, click again to reverse. The **Enabled** column sorts unchecked-before-checked when ascending (and the opposite when descending). Enable/disable toggles and **Apply** behavior are unchanged; selection state is kept when filtering rows.
 
 ### Added
 
