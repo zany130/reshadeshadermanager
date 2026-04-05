@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 import os
 import re
@@ -442,6 +443,10 @@ def apply_plugin_addon_installation(
     companion ``.fx`` / textures are symlinked under ``reshade-shaders/Shaders/addons/<id>/``
     and ``.../Textures/addons/<id>/``. Fails on conflicts with unmanaged files or
     ReShade-tracked DLLs. ZIP archives use fail-closed payload choice.
+
+    Before copying into ``game_dir``, all selected add-ons are checked for root
+    filename conflicts (using a simulated manifest) so a failure does not leave a
+    partial install.
     """
     gd = game_dir.resolve()
     if not gd.is_dir():
@@ -460,6 +465,21 @@ def apply_plugin_addon_installation(
     for aid in list(manifest.plugin_addon_root_copies.keys()):
         if aid not in desired_plugin_addon_ids:
             _remove_addon_install(paths, manifest, gd, aid)
+
+    # Preflight: resolve payloads and check root conflicts for *all* desired add-ons before
+    # copying anything into game_dir. Simulates manifest state after each planned install
+    # so later add-ons see earlier ones (avoids partial disk writes + failed save).
+    m_sim = copy.deepcopy(manifest)
+    for aid in sorted(effective_desired):
+        entry = catalog_by_id.get(aid)
+        if not entry:
+            continue
+        url = resolve_download_url_for_arch(entry, arch=arch)
+        payload, _extract_root = prepare_payload_file(paths, aid, url, arch=arch)
+        dest_basename = payload.name
+        _assert_install_conflict(gd, dest_basename, m_sim, installing_addon_id=aid)
+        m_sim.plugin_addon_root_copies[aid] = [dest_basename]
+        m_sim.plugin_addon_companion_symlinks[aid] = []
 
     for aid in sorted(effective_desired):
         entry = catalog_by_id.get(aid)

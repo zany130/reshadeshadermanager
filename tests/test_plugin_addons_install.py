@@ -247,6 +247,73 @@ def test_conflict_existing_unmanaged_file(tmp_path: Path, monkeypatch: pytest.Mo
         )
 
 
+def test_multi_addon_preflight_aborts_before_any_game_dir_copy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """If a later add-on conflicts, earlier add-ons must not be copied into game_dir."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    paths = RsmPaths.from_env()
+    paths.ensure_layout()
+    game = tmp_path / "game"
+    game.mkdir()
+    p1 = tmp_path / "one.addon64"
+    p1.write_bytes(b"a")
+    p2 = tmp_path / "two.addon64"
+    p2.write_bytes(b"b")
+    (game / "two.addon64").write_text("unmanaged", encoding="utf-8")
+    m = new_game_manifest(game)
+    m.reshade_arch = "64"
+    cat = {
+        "a1": {
+            "id": "a1",
+            "name": "One",
+            "description": "",
+            "download_url_32": "",
+            "download_url_64": "https://example.com/one.addon64",
+            "download_url": "",
+            "repository_url": "",
+            "effect_install_path": "",
+            "upstream_section": "",
+            "source": "upstream",
+        },
+        "a2": {
+            "id": "a2",
+            "name": "Two",
+            "description": "",
+            "download_url_32": "",
+            "download_url_64": "https://example.com/two.addon64",
+            "download_url": "",
+            "repository_url": "",
+            "effect_install_path": "",
+            "upstream_section": "",
+            "source": "upstream",
+        },
+    }
+
+    def fake_prepare(_paths, addon_id, _url, *, arch):
+        if addon_id == "a1":
+            return p1, None
+        if addon_id == "a2":
+            return p2, None
+        raise AssertionError(addon_id)
+
+    with (
+        patch("reshade_shader_manager.core.plugin_addons_install.prepare_payload_file", side_effect=fake_prepare),
+        pytest.raises(RSMError, match="not managed by RSM"),
+    ):
+        apply_plugin_addon_installation(
+            paths=paths,
+            manifest=m,
+            game_dir=game,
+            desired_plugin_addon_ids={"a1", "a2"},
+            catalog_by_id=cat,
+        )
+
+    assert not (game / "one.addon64").exists()
+    assert (game / "two.addon64").read_text(encoding="utf-8") == "unmanaged"
+    assert m.plugin_addon_root_copies == {}
+
+
 def test_zip_roundtrip_prepare(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
     paths = RsmPaths.from_env()
