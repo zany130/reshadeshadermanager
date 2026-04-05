@@ -5,6 +5,6 @@ Comment=Manage ReShade and shader repositories for Linux games
 Exec=reshade-shader-manager
 Icon=reshade-shader-manager
 Categories=Utility;Graphics;
-Keywords=ReShade;shader;Vulkan;OpenGL;DirectX;
+Keywords=ReShade;shader;Vulkan;OpenGL;DirectX;rsm;
 Terminal=false
 StartupNotify=true
