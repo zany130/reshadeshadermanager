@@ -16,7 +16,7 @@ cd "${ROOT}"
 
 APPDIR="${SCRIPT_DIR}/AppDir"
 DIST="${ROOT}/dist/reshade-shader-manager"
-VERSION="${RSM_APPIMAGE_VERSION:-0.5.0}"
+VERSION="${RSM_APPIMAGE_VERSION:-0.6.0}"
 APPIMAGETOOL="${APPIMAGETOOL:-${SCRIPT_DIR}/tools/appimagetool}"
 
 echo "==> Repo root: ${ROOT}"

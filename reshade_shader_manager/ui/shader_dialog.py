@@ -7,19 +7,25 @@ import threading
 from pathlib import Path
 from typing import Callable
 
-from gi.repository import GLib, Gtk
+from gi.repository import Gio, GLib, Gtk
 
 from reshade_shader_manager.core.config import AppConfig
 from reshade_shader_manager.core.link_farm import apply_shader_projection
 from reshade_shader_manager.core.manifest import load_game_manifest, new_game_manifest
 from reshade_shader_manager.core.paths import RsmPaths
+from reshade_shader_manager.ui.catalog_column_view import (
+    CatalogRow,
+    build_catalog_column_view,
+    connect_search_invalidate,
+    populate_catalog_store,
+)
 from reshade_shader_manager.ui.error_format import format_exception_for_ui
 
 log = logging.getLogger(__name__)
 
 
 class ShaderRepoWindow(Gtk.Window):
-    """Checklist of repos; Apply runs backend enable/disable on a worker thread."""
+    """Catalog table with search; Apply runs backend enable/disable on a worker thread."""
 
     def __init__(
         self,
@@ -35,7 +41,7 @@ class ShaderRepoWindow(Gtk.Window):
             transient_for=parent,
             modal=True,
             title="Shader repositories",
-            default_width=520,
+            default_width=800,
             default_height=420,
         )
         self._paths = paths
@@ -43,7 +49,7 @@ class ShaderRepoWindow(Gtk.Window):
         self._game_dir = game_dir
         self._catalog = catalog
         self._on_done = on_done
-        self._checks: dict[str, Gtk.CheckButton] = {}
+        self._enabled_by_id: dict[str, bool] = {}
         self._apply_btn: Gtk.Button | None = None
 
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
@@ -52,34 +58,29 @@ class ShaderRepoWindow(Gtk.Window):
         outer.set_margin_top(12)
         outer.set_margin_bottom(12)
 
-        scroll = Gtk.ScrolledWindow()
-        scroll.set_vexpand(True)
-        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        list_box = Gtk.ListBox()
-        list_box.set_selection_mode(Gtk.SelectionMode.NONE)
-        scroll.set_child(list_box)
-
         m = load_game_manifest(paths, game_dir) or new_game_manifest(game_dir)
         enabled = set(m.enabled_repo_ids)
 
         for repo in catalog:
-            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-            row.set_margin_start(8)
-            row.set_margin_end(8)
-            row.set_margin_top(4)
-            row.set_margin_bottom(4)
-            cb = Gtk.CheckButton()
-            cb.set_active(repo["id"] in enabled)
-            self._checks[repo["id"]] = cb
-            row.append(cb)
-            lbl = Gtk.Label(
-                label=f"{repo['name']}  ({repo['id']}) — {repo.get('source', '')}",
-                xalign=0.0,
-                hexpand=True,
-                wrap=True,
-            )
-            row.append(lbl)
-            list_box.append(row)
+            rid = repo["id"]
+            self._enabled_by_id[rid] = rid in enabled
+
+        search = Gtk.SearchEntry()
+        search.set_placeholder_text("Search…")
+        search.set_hexpand(True)
+
+        store = Gio.ListStore(item_type=CatalogRow)
+        populate_catalog_store(store, catalog)
+
+        scroll, custom_filter = build_catalog_column_view(
+            store,
+            self._enabled_by_id,
+            lambda: search.get_text(),
+        )
+        connect_search_invalidate(search, custom_filter)
+
+        outer.append(search)
+        outer.append(scroll)
 
         btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         btn_row.set_halign(Gtk.Align.END)
@@ -92,7 +93,6 @@ class ShaderRepoWindow(Gtk.Window):
         btn_row.append(cancel)
         btn_row.append(apply_b)
 
-        outer.append(scroll)
         outer.append(btn_row)
         self.set_child(outer)
 
@@ -101,7 +101,7 @@ class ShaderRepoWindow(Gtk.Window):
         if apply_b:
             apply_b.set_sensitive(False)
 
-        desired = {rid for rid, cb in self._checks.items() if cb.get_active()}
+        desired = {rid for rid, on in self._enabled_by_id.items() if on}
 
         def work() -> None:
             by_id = {r["id"]: r for r in self._catalog}

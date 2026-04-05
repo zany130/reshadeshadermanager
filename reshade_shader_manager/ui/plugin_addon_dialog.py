@@ -7,7 +7,7 @@ import threading
 from pathlib import Path
 from typing import Callable
 
-from gi.repository import GLib, Gtk
+from gi.repository import Gio, GLib, Gtk
 
 from reshade_shader_manager.core.manifest import GameManifest
 from reshade_shader_manager.core.plugin_addons_install import (
@@ -15,13 +15,19 @@ from reshade_shader_manager.core.plugin_addons_install import (
     filter_catalog_installable_for_arch,
 )
 from reshade_shader_manager.core.paths import RsmPaths
+from reshade_shader_manager.ui.catalog_column_view import (
+    CatalogRow,
+    build_catalog_column_view,
+    connect_search_invalidate,
+    populate_catalog_store,
+)
 from reshade_shader_manager.ui.error_format import format_exception_for_ui
 
 log = logging.getLogger(__name__)
 
 
 class PluginAddonWindow(Gtk.Window):
-    """Checklist of plugin add-ons from merged catalog; Apply copies DLLs into the game folder."""
+    """Catalog table with search; Apply copies DLLs into the game folder."""
 
     def __init__(
         self,
@@ -37,7 +43,7 @@ class PluginAddonWindow(Gtk.Window):
             transient_for=parent,
             modal=True,
             title="Plugin add-ons",
-            default_width=560,
+            default_width=800,
             default_height=420,
         )
         self._paths = paths
@@ -45,7 +51,7 @@ class PluginAddonWindow(Gtk.Window):
         self._catalog = catalog
         self._sync_manifest = sync_manifest
         self._on_done = on_done
-        self._checks: dict[str, Gtk.CheckButton] = {}
+        self._enabled_by_id: dict[str, bool] = {}
         self._apply_btn: Gtk.Button | None = None
 
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
@@ -64,21 +70,16 @@ class PluginAddonWindow(Gtk.Window):
         )
         outer.append(hint)
 
-        scroll = Gtk.ScrolledWindow()
-        scroll.set_vexpand(True)
-        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        list_box = Gtk.ListBox()
-        list_box.set_selection_mode(Gtk.SelectionMode.NONE)
-        scroll.set_child(list_box)
-
         m = sync_manifest()
         enabled = set(m.enabled_plugin_addon_ids)
         arch = m.reshade_arch if m.reshade_arch in ("32", "64") else "64"
         eligible = filter_catalog_installable_for_arch(catalog, arch=arch)
 
         if not eligible:
-            empty_row = Gtk.ListBoxRow()
-            empty_row.set_child(
+            scroll = Gtk.ScrolledWindow()
+            scroll.set_vexpand(True)
+            scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+            scroll.set_child(
                 Gtk.Label(
                     label="No plugin add-ons are available for this game architecture, "
                     "or none list a download URL that matches it.",
@@ -86,28 +87,28 @@ class PluginAddonWindow(Gtk.Window):
                     wrap=True,
                 )
             )
-            list_box.append(empty_row)
+            outer.append(scroll)
         else:
             for row in eligible:
                 rid = row["id"]
-                row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-                row_box.set_margin_start(8)
-                row_box.set_margin_end(8)
-                row_box.set_margin_top(4)
-                row_box.set_margin_bottom(4)
-                cb = Gtk.CheckButton()
-                cb.set_active(rid in enabled)
-                self._checks[rid] = cb
-                row_box.append(cb)
-                src = row.get("source", "")
-                lbl = Gtk.Label(
-                    label=f"{row.get('name', rid)}  ({rid}) — {src}",
-                    xalign=0.0,
-                    hexpand=True,
-                    wrap=True,
-                )
-                row_box.append(lbl)
-                list_box.append(row_box)
+                self._enabled_by_id[rid] = rid in enabled
+
+            search = Gtk.SearchEntry()
+            search.set_placeholder_text("Search…")
+            search.set_hexpand(True)
+
+            store = Gio.ListStore(item_type=CatalogRow)
+            populate_catalog_store(store, eligible)
+
+            scroll, custom_filter = build_catalog_column_view(
+                store,
+                self._enabled_by_id,
+                lambda: search.get_text(),
+            )
+            connect_search_invalidate(search, custom_filter)
+
+            outer.append(search)
+            outer.append(scroll)
 
         btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         btn_row.set_halign(Gtk.Align.END)
@@ -120,7 +121,6 @@ class PluginAddonWindow(Gtk.Window):
         btn_row.append(cancel)
         btn_row.append(apply_b)
 
-        outer.append(scroll)
         outer.append(btn_row)
         self.set_child(outer)
 
@@ -129,7 +129,7 @@ class PluginAddonWindow(Gtk.Window):
         if apply_b:
             apply_b.set_sensitive(False)
 
-        desired = {rid for rid, cb in self._checks.items() if cb.get_active()}
+        desired = {rid for rid, on in self._enabled_by_id.items() if on}
         by_id = {r["id"]: r for r in self._catalog}
 
         def work() -> None:
