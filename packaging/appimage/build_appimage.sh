@@ -16,7 +16,11 @@ cd "${ROOT}"
 
 APPDIR="${SCRIPT_DIR}/AppDir"
 DIST="${ROOT}/dist/reshade-shader-manager"
-VERSION="${RSM_APPIMAGE_VERSION:-0.6.0}"
+if [[ -n "${RSM_APPIMAGE_VERSION:-}" ]]; then
+	VERSION="${RSM_APPIMAGE_VERSION}"
+else
+	VERSION="$(python3 -c "import tomllib, pathlib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version'])")"
+fi
 APPIMAGETOOL="${APPIMAGETOOL:-${SCRIPT_DIR}/tools/appimagetool}"
 
 echo "==> Repo root: ${ROOT}"
