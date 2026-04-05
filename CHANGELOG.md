@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.7.0
+
+### Added
+
+- **AppImage:** Pre-rendered hicolor PNGs (64–512), `reshade-shader-manager.png` at AppDir root, desktop `Categories`/`Keywords`, and `make_icon.py` validation so the build does not require ImageMagick.
+- **GTK:** Main window sets `icon_name` to `reshade-shader-manager` for window and taskbar integration when the icon theme provides that name.
+
+### Documentation
+
+- `packaging/README.md`: where AppImage icons live and how to regenerate PNGs offline.
+
 ## 0.6.0
 
 ### Changed
