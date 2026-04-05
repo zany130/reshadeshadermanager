@@ -242,6 +242,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="rsm",
         description="ReShade Shader Manager — command-line interface (uses the same backend as the GTK app).",
+        epilog="Exit codes: 0 success, 1 user error, 2 internal error, 130 interrupted (Ctrl+C).",
     )
     p.add_argument(
         "-v",
@@ -253,17 +254,28 @@ def _build_parser() -> argparse.ArgumentParser:
 
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    cat = sub.add_parser("catalog", help="Refresh upstream catalog caches (PCGW, shader merge, Addons.ini).")
+    cat = sub.add_parser(
+        "catalog",
+        help="Refresh upstream catalog caches (same as GUI Refresh catalog: PCGW, shader merge, Addons.ini).",
+    )
     cat_sub = cat.add_subparsers(dest="catalog_cmd", required=True)
     cat_sub.add_parser("refresh", help="Network refresh of PCGW list, merged shader catalog, and plugin add-on catalog.")
 
-    sh = sub.add_parser("shaders", help="Shader repository clone/symlink projection.")
+    sh = sub.add_parser(
+        "shaders",
+        help="Shader repos: apply symlink projection to the game tree, or bulk-update local git clones.",
+    )
     sh_sub = sh.add_subparsers(dest="shaders_cmd", required=True)
     sap = sh_sub.add_parser(
         "apply",
         help="Rebuild game reshade-shaders/ symlinks to match selected repo ids (same as GUI Apply).",
     )
-    sap.add_argument("--game-dir", required=True, help="Game installation root (Wine/Proton prefix path).")
+    sap.add_argument(
+        "--game-dir",
+        required=True,
+        metavar="DIR",
+        help="Game installation root (Wine/Proton prefix path).",
+    )
     sap.add_argument(
         "--repo",
         action="append",
@@ -286,10 +298,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Refresh network catalogs before updating clones.",
     )
 
-    ad = sub.add_parser("addons", help="Official plugin add-ons (Addons.ini catalog).")
+    ad = sub.add_parser(
+        "addons",
+        help="Official plugin add-ons from the Addons.ini-derived catalog (DLL copies into the game folder).",
+    )
     ad_sub = ad.add_subparsers(dest="addons_cmd", required=True)
     adap = ad_sub.add_parser("apply", help="Install or reconcile plugin DLLs for selected add-on ids.")
-    adap.add_argument("--game-dir", required=True)
+    adap.add_argument(
+        "--game-dir",
+        required=True,
+        metavar="DIR",
+        help="Game installation root (Wine/Proton prefix path).",
+    )
     adap.add_argument(
         "--addon",
         action="append",
@@ -304,7 +324,12 @@ def _build_parser() -> argparse.ArgumentParser:
     rs_sub = rs.add_subparsers(dest="reshade_cmd", required=True)
 
     def add_reshade_common(sp: argparse.ArgumentParser) -> None:
-        sp.add_argument("--game-dir", required=True)
+        sp.add_argument(
+            "--game-dir",
+            required=True,
+            metavar="DIR",
+            help="Game installation root (Wine/Proton prefix path).",
+        )
         sp.add_argument("--exe", help="Optional path to game .exe (helps PE arch detection).")
         sp.add_argument(
             "--api",
@@ -324,14 +349,29 @@ def _build_parser() -> argparse.ArgumentParser:
     r_up = rs_sub.add_parser("update", help='Install latest upstream ReShade (same as install with version "latest").')
     add_reshade_common(r_up)
     r_rm = rs_sub.add_parser("remove", help="Remove only files listed in the manifest (ReShade binaries).")
-    r_rm.add_argument("--game-dir", required=True)
+    r_rm.add_argument(
+        "--game-dir",
+        required=True,
+        metavar="DIR",
+        help="Game installation root (Wine/Proton prefix path).",
+    )
     r_ck = rs_sub.add_parser("check", help="Verify tracked ReShade files exist on disk.")
-    r_ck.add_argument("--game-dir", required=True)
+    r_ck.add_argument(
+        "--game-dir",
+        required=True,
+        metavar="DIR",
+        help="Game installation root (Wine/Proton prefix path).",
+    )
 
     gm = sub.add_parser("game", help="Inspect saved per-game profile.")
     gm_sub = gm.add_subparsers(dest="game_cmd", required=True)
     gin = gm_sub.add_parser("inspect", help="Print manifest fields for a game directory.")
-    gin.add_argument("--game-dir", required=True)
+    gin.add_argument(
+        "--game-dir",
+        required=True,
+        metavar="DIR",
+        help="Game installation root (Wine/Proton prefix path).",
+    )
     gin.add_argument("--exe", help="Optional; passed to manifest resolution.")
     gin.add_argument("--json", action="store_true", help="Print JSON (schema matches saved manifest).")
 
