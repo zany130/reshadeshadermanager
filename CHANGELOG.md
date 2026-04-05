@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.8.0
+
+Release-candidate stabilization: clarity, consistency, and regression coverage—no new major features.
+
+### Changed
+
+- **CLI (`rsm`):** Clearer subcommand descriptions; `--game-dir` documented consistently with `DIR` metavar; `--help` epilog documents exit codes (`0` / `1` / `2` / `130`). `GameManifest` import fixed for type accuracy; `ValueError` paths use the same exception formatter as other user-facing errors.
+- **GTK:** “Manage shaders” / “Manage plugin add-ons” dialog titles align with buttons; search fields clarify which columns are filtered; recent-games empty state wording (“No recent games yet.”).
+
+### Added
+
+- **Tests:** CLI coverage for `reshade check` / `reshade remove` without a manifest, and `addons apply` without `--addon`.
+
+### Documentation
+
+- **README:** GTK/CLI wording updated (removed stale version labels); **dx8** listed in graphics APIs; **CLI exit codes** table; roadmap note for v1.0 direction.
+
 ## 0.7.1
 
 ### Fixed

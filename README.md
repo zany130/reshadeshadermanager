@@ -8,12 +8,12 @@ Standalone Linux tool to manage:
 
 App icon assets: `packaging/appimage/icons/hicolor/` (source logo: `packaging/appimage/branding/`).
 
-GTK UI (**v0.2**) is a thin frontend over a metadata-driven backend core.
+The **GTK 4** UI is a thin frontend over the same metadata-driven backend as the CLI.
 
 ## Features
 
 - Pick a game directory (+ optional `.exe` to detect 32/64-bit)
-- Select graphics API (`opengl`, `dx9`, `dx10`, `dx11`, `dx12`) and ReShade variant (`standard`/`addon`)
+- Select graphics API (`opengl`, `dx8`, `dx9`, `dx10`, `dx11`, `dx12`) and ReShade variant (`standard`/`addon`)
 - Install / remove ReShade binaries; **Update / Reinstall Latest** resolves current upstream `latest` (GitHub tags / cache) for the selected standard or addon variant and reinstalls
 - Check that installed ReShade binaries exist
 - Refresh shader catalog (built-in + user `repos.json` + cached PCGamingWiki); same action refreshes the **plugin add-on** list from official upstream `Addons.ini` only (cached)
@@ -53,7 +53,7 @@ reshade-shader-manager
 # or: python3 -m reshade_shader_manager.main
 ```
 
-## Command-line interface (v0.5+)
+## Command-line interface
 
 After `pip install --no-deps -e .`, the **`rsm`** command is available (no display required). It uses the same core as the GUI:
 
@@ -68,6 +68,15 @@ rsm game inspect --game-dir /path/to/game --json
 ```
 
 See `rsm --help` and [CHANGELOG.md](CHANGELOG.md) for the full command set.
+
+### CLI exit codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success |
+| `1` | User error (invalid input, missing manifest, ReShade **check** found missing files, etc.) |
+| `2` | Unexpected internal error (use `rsm -v …` for a traceback) |
+| `130` | Interrupted (Ctrl+C) |
 
 ## Testing against a real game
 
@@ -96,7 +105,7 @@ Per-game projection happens under:
 
 ## Notes / limitations
 
-- v0.2 supports one active ReShade install state per game directory (reinstall replaces the tracked proxy binaries list; no multi-runtime merging).
+- RSM supports **one active ReShade install state per game directory** (reinstall replaces the tracked proxy binaries list; no multi-runtime merging).
 - **DirectX 8** uses **d3d8to9** (`d3d8.dll`) plus ReShade as **`d3d9.dll`**. The pinned crosire release currently ships a **32-bit** `d3d8.dll` only; **64-bit games** get a clear error at install time.
 - “Remove ReShade” is binary-only: it deletes files tracked in `installed_reshade_files` and does **not** remove shader symlinks, enabled repo state, or `ReShade.ini` by default.
 
@@ -104,9 +113,9 @@ Per-game projection happens under:
 
 See [packaging/README.md](packaging/README.md) for pip, wheels, optional **AppImage** build steps, Flatpak notes, and distro hints.
 
-## Roadmap (post–v0.2)
+## Roadmap
 
-- CLI for scripting
+- **v1.0:** Stabilization and polish (see [CHANGELOG.md](CHANGELOG.md)); broader CLI test coverage and optional AppStream metadata for AppImage are possible follow-ups.
 - Multi-profile per game (currently a non-goal)
 
 Details: [CONTEXT.md](CONTEXT.md), [PROJECT_SPEC.md](PROJECT_SPEC.md), and [CHANGELOG.md](CHANGELOG.md).
