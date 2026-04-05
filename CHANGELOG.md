@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.0.0
+
+First stable release. High-level themes (see earlier entries for incremental detail):
+
+- **Shader layout:** Merged `reshade-shaders/Shaders/` and `Textures/` trees with correctness-first **path conflict** handling (skip entire conflicting repo; deterministic order).
+- **Plugin add-ons:** Official **Addons.ini**–driven installs; companion shaders/textures use the same merged layout as shader repos.
+- **CLI (`rsm`):** Parity with core flows (catalog, shaders, add-ons, ReShade, game inspect).
+- **GTK:** Shader and add-on tables with search and sorting; **Recent games** list.
+- **Packaging:** AppImage workflow, icons, and desktop integration polish.
+- **Stabilization:** Polishing, regression tests, removal of active **`ReShade.ini`** management (ReShade owns its config); documentation and manual QA alignment for release.
+
 ## 0.8.0
 
 Release-candidate stabilization: clarity, consistency, and regression coverage—no new major features.

@@ -4,7 +4,7 @@ Standalone Linux tool to manage:
 
 - ReShade installation/update/removal (proxy DLLs only; ReShade manages its own `ReShade.ini`)
 - Git-based shader repositories (clone/pull)
-- Per-game shader enable/disable via directory symlinks
+- Per-game shader enable/disable (merged `Shaders/` / `Textures/` projection via symlinks)
 
 App icon assets: `packaging/appimage/icons/hicolor/` (source logo: `packaging/appimage/branding/`).
 
@@ -114,8 +114,8 @@ See [packaging/README.md](packaging/README.md) for pip, wheels, optional **AppIm
 
 ## Roadmap
 
-- **v1.0:** Stabilization and polish (see [CHANGELOG.md](CHANGELOG.md)); broader CLI test coverage and optional AppStream metadata for AppImage are possible follow-ups.
-- Multi-profile per game (currently a non-goal)
+- **v1.0** is the current stable line (see [CHANGELOG.md](CHANGELOG.md)).
+- **Post-1.0 (non-goals / follow-ups):** optional AppStream metadata for AppImage, broader CLI test coverage, multi-profile per game.
 
 Details: [CONTEXT.md](CONTEXT.md), [PROJECT_SPEC.md](PROJECT_SPEC.md), and [CHANGELOG.md](CHANGELOG.md).
 
