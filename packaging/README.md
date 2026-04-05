@@ -52,7 +52,7 @@ From the repository root on a **Fedora-like** build machine with `gtk4`, `python
 ./packaging/appimage/build_appimage.sh
 ```
 
-This runs PyInstaller (onedir) and produces `packaging/appimage/reshade-shader-manager-<version>-x86_64.AppImage` by default (override with `RSM_APPIMAGE_VERSION`). The bundle is compressed to roughly tens of megabytes; the unpacked tree is much larger because PyInstaller’s GObject/GTK hooks collect typelibs and related data. **GTK 4 is still expected on the host** at runtime.
+This runs PyInstaller (onedir) and produces `packaging/appimage/reshade-shader-manager-<version>-x86_64.AppImage` by default (override with `RSM_APPIMAGE_VERSION`). The `<version>` segment, the `VERSION` passed to `appimagetool`, and **`X-AppImage-Version`** in the bundled `.desktop` file all come from **`pyproject.toml` `[project] version`** unless you set **`RSM_APPIMAGE_VERSION`**. The bundle is compressed to roughly tens of megabytes; the unpacked tree is much larger because PyInstaller’s GObject/GTK hooks collect typelibs and related data. **GTK 4 is still expected on the host** at runtime.
 
 ### AppImage icons
 

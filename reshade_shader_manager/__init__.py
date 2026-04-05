@@ -1,3 +1,4 @@
 """ReShade Shader Manager — backend core + (later) GTK UI."""
 
-__version__ = "0.8.0"
+# Keep in sync with pyproject.toml [project] version.
+__version__ = "1.0.0"

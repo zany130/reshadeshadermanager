@@ -57,6 +57,15 @@ _DESKTOP="io.github.rsm.reshade_shader_manager.desktop"
 cp "${SCRIPT_DIR}/${_DESKTOP}" "${APPDIR}/${_DESKTOP}"
 cp "${SCRIPT_DIR}/${_DESKTOP}" "${APPDIR}/usr/share/applications/${_DESKTOP}"
 
+# Match pyproject [project] version / AppImage filename (same as ${VERSION} above).
+for _d in "${APPDIR}/${_DESKTOP}" "${APPDIR}/usr/share/applications/${_DESKTOP}"; do
+	if grep -q '^X-AppImage-Version=' "${_d}"; then
+		sed -i "s/^X-AppImage-Version=.*/X-AppImage-Version=${VERSION}/" "${_d}"
+	else
+		printf '\nX-AppImage-Version=%s\n' "${VERSION}" >> "${_d}"
+	fi
+done
+
 for _size in 64 128 256 512; do
   mkdir -p "${APPDIR}/usr/share/icons/hicolor/${_size}x${_size}/apps"
   cp "${SCRIPT_DIR}/icons/hicolor/${_size}x${_size}/apps/reshade-shader-manager.png" \
