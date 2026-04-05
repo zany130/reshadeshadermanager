@@ -115,7 +115,7 @@ See [packaging/README.md](packaging/README.md) for pip, wheels, optional **AppIm
 
 ## Roadmap
 
-- **v1.0** is the current stable line (see [CHANGELOG.md](CHANGELOG.md)).
+- **v1.0.x** is the current stable line (see [CHANGELOG.md](CHANGELOG.md); **1.0.0** was the first stable release).
 - **Post-1.0 (non-goals / follow-ups):** optional AppStream metadata for AppImage, broader CLI test coverage, multi-profile per game.
 
 Details: [CONTEXT.md](CONTEXT.md), [PROJECT_SPEC.md](PROJECT_SPEC.md), and [CHANGELOG.md](CHANGELOG.md).

@@ -2,6 +2,14 @@
 
 Run **`python3 -m pytest`** — all tests must pass first.
 
+## Release checklist (maintainers)
+
+Before **`git tag vX.Y.Z`** and publishing artifacts (GitHub Release, AppImage, etc.):
+
+1. **Automated tests:** `python3 -m pytest` — all green.
+2. **Mandatory E2E** (next section) on a **real** Wine/Proton game directory — including **in-game** shader verification.
+3. **Version alignment:** `pyproject.toml` `project.version` matches the tag you are about to publish. The AppImage build reads this version by default (see `packaging/appimage/build_appimage.sh`).
+
 ## Mandatory: real prefix / end-to-end (do not skip before tagging)
 
 On a **real game directory** (Wine or Proton prefix), run this flow at least once per major release:
