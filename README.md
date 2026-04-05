@@ -124,6 +124,7 @@ Details: [CONTEXT.md](CONTEXT.md), [PROJECT_SPEC.md](PROJECT_SPEC.md), and [CHAN
 
 See:
 
+- `docs/MANUAL_QA.md` (manual regression checklist before a release tag)
 - `CHANGELOG.md`
 - `PROJECT_SPEC.md`
 - `IMPLEMENTATION_PLAN.md`

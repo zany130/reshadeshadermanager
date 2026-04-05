@@ -18,6 +18,7 @@ Release-candidate stabilization: clarity, consistency, and regression coverageâ€
 ### Documentation
 
 - **README:** GTK/CLI wording updated (removed stale version labels); **dx8** listed in graphics APIs; **CLI exit codes** table; roadmap note for v1.0 direction.
+- **`docs/MANUAL_QA.md`:** Short manual regression checklist for RC/release verification.
 
 ## 0.7.1
 
