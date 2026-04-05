@@ -57,3 +57,27 @@ def test_cli_shaders_apply_requires_repo(tmp_path: Path, monkeypatch: pytest.Mon
     game_dir = (tmp_path / "g").resolve()
     game_dir.mkdir()
     assert main(["shaders", "apply", "--game-dir", str(game_dir)]) != 0
+
+
+def test_cli_reshade_check_no_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    RsmPaths.from_env().ensure_layout()
+    game_dir = (tmp_path / "g").resolve()
+    game_dir.mkdir()
+    assert main(["reshade", "check", "--game-dir", str(game_dir)]) != 0
+
+
+def test_cli_reshade_remove_no_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    RsmPaths.from_env().ensure_layout()
+    game_dir = (tmp_path / "g").resolve()
+    game_dir.mkdir()
+    assert main(["reshade", "remove", "--game-dir", str(game_dir)]) != 0
+
+
+def test_cli_addons_apply_requires_addon(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    RsmPaths.from_env().ensure_layout()
+    game_dir = (tmp_path / "g").resolve()
+    game_dir.mkdir()
+    assert main(["addons", "apply", "--game-dir", str(game_dir)]) != 0

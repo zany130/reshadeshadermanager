@@ -16,7 +16,7 @@ from reshade_shader_manager.core.error_format import format_exception_for_ui
 from reshade_shader_manager.core.exceptions import RSMError, VersionResolutionError
 from reshade_shader_manager.core.git_sync import pull_existing_clones_for_catalog
 from reshade_shader_manager.core.link_farm import apply_shader_projection
-from reshade_shader_manager.core.manifest import load_game_manifest, new_game_manifest
+from reshade_shader_manager.core.manifest import GameManifest, load_game_manifest, new_game_manifest
 from reshade_shader_manager.core.paths import RsmPaths, get_paths
 from reshade_shader_manager.core.plugin_addons_catalog import get_upstream_plugin_addons
 from reshade_shader_manager.core.plugin_addons_install import (
@@ -382,7 +382,7 @@ def main(argv: list[str] | None = None) -> int:
         print(format_exception_for_ui(e), file=sys.stderr)
         return EXIT_USER
     except ValueError as e:
-        print(str(e), file=sys.stderr)
+        print(format_exception_for_ui(e), file=sys.stderr)
         return EXIT_USER
     except KeyboardInterrupt:
         print("Interrupted.", file=sys.stderr)
