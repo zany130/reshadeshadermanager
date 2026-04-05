@@ -5,7 +5,6 @@ from __future__ import annotations
 import copy
 import logging
 import os
-import re
 import shutil
 import urllib.error
 import urllib.parse
@@ -28,12 +27,6 @@ USER_AGENT = "reshade-shader-manager/0.2 (plugin add-on install)"
 # Companion files in add-on ZIPs (plus common extra shader extensions).
 _COMPANION_SHADER_EXTS = frozenset(_LF_SHADER_EXTS) | {".hlsl", ".hlsli"}
 _COMPANION_TEXTURE_EXTS = frozenset(_LF_TEXTURE_EXTS)
-
-
-def _fs_slug_addon_id(addon_id: str) -> str:
-    """Safe single path segment under ``reshade-shaders/.../addons/<segment>/``."""
-    s = re.sub(r"[^a-z0-9_-]+", "_", addon_id.strip().lower())[:48].strip("_") or "addon"
-    return s
 
 
 def resolve_download_url_for_arch(entry: dict[str, str], *, arch: str) -> str:
@@ -297,8 +290,9 @@ def _install_companion_symlinks_from_extract(
     payload_path: Path,
 ) -> list[str]:
     """
-    Symlink non-payload shader/texture files from ``extract_root`` into
-    ``reshade-shaders/Shaders/addons/<slug>/`` and ``.../Textures/addons/<slug>/``.
+    Symlink non-payload shader/texture files from ``extract_root`` into the merged
+    ``reshade-shaders/Shaders/`` and ``.../Textures/`` trees (same layout rules as
+    shader repos: preserve paths under ``Shaders/`` / ``Textures/`` in the archive).
 
     Returns absolute paths of created symlinks (for the manifest).
     """
@@ -309,10 +303,9 @@ def _install_companion_symlinks_from_extract(
     except OSError:
         pay = payload_path
 
-    slug = _fs_slug_addon_id(addon_id)
     base = gd / "reshade-shaders"
-    sh_base = base / "Shaders" / "addons" / slug
-    tx_base = base / "Textures" / "addons" / slug
+    sh_base = base / "Shaders"
+    tx_base = base / "Textures"
 
     dst_to_src: dict[Path, Path] = {}
     for dirpath, dirnames, filenames in os.walk(er, topdown=True):
@@ -440,9 +433,10 @@ def apply_plugin_addon_installation(
     Reconcile on-disk plugin add-ons and manifest to match ``desired_plugin_addon_ids``.
 
     Copies payloads into ``game_dir`` (never symlinks for root DLLs). For ZIP archives,
-    companion ``.fx`` / textures are symlinked under ``reshade-shaders/Shaders/addons/<id>/``
-    and ``.../Textures/addons/<id>/``. Fails on conflicts with unmanaged files or
-    ReShade-tracked DLLs. ZIP archives use fail-closed payload choice.
+    companion ``.fx`` / textures are symlinked into the merged ``reshade-shaders/Shaders/``
+    and ``.../Textures/`` trees (archive-internal layout preserved; no per-add-on folder).
+    Fails on conflicts with unmanaged files or ReShade-tracked DLLs. ZIP archives use
+    fail-closed payload choice.
 
     Before copying into ``game_dir``, all selected add-ons are checked for root
     filename conflicts (using a simulated manifest) so a failure does not leave a

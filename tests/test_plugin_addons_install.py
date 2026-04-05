@@ -377,10 +377,65 @@ def test_apply_zip_creates_companion_symlinks(tmp_path: Path, monkeypatch: pytes
         desired_plugin_addon_ids={"myaddon"},
         catalog_by_id=cat,
     )
-    link = game / "reshade-shaders" / "Shaders" / "addons" / "myaddon" / "companion.fx"
+    link = game / "reshade-shaders" / "Shaders" / "companion.fx"
     assert link.is_symlink()
     assert m.plugin_addon_root_copies["myaddon"] == ["x.addon64"]
     assert os.path.abspath(link) in m.plugin_addon_companion_symlinks["myaddon"]
+
+
+def test_apply_zip_companion_preserves_internal_paths_in_merged_shaders(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Companion files use merged Shaders/ tree — no addons/<id>/ wrapper."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    paths = RsmPaths.from_env()
+    paths.ensure_layout()
+    game = tmp_path / "game"
+    game.mkdir()
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("nested/p.addon64", b"fake64")
+        zf.writestr("Shaders/ShaderToggler.fx", b"// fx\n")
+        zf.writestr("Shaders/includes/common.fxh", b"// inc\n")
+    addon_id = "tog"
+    url = "https://example.com/tog.zip"
+    cache_dir = paths.plugin_addon_artifact_dir(addon_id, url)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    (cache_dir / "tog.zip").write_bytes(buf.getvalue())
+
+    m = new_game_manifest(game)
+    m.reshade_arch = "64"
+    cat = {
+        "tog": {
+            "id": "tog",
+            "name": "Toggler",
+            "description": "",
+            "download_url_32": "",
+            "download_url_64": url,
+            "download_url": "",
+            "repository_url": "",
+            "effect_install_path": "",
+            "upstream_section": "",
+            "source": "upstream",
+        }
+    }
+    apply_plugin_addon_installation(
+        paths=paths,
+        manifest=m,
+        game_dir=game,
+        desired_plugin_addon_ids={"tog"},
+        catalog_by_id=cat,
+    )
+    fx = game / "reshade-shaders" / "Shaders" / "ShaderToggler.fx"
+    inc = game / "reshade-shaders" / "Shaders" / "includes" / "common.fxh"
+    assert fx.is_symlink()
+    assert inc.is_symlink()
+    assert not (game / "reshade-shaders" / "Shaders" / "addons").exists()
+    recorded = m.plugin_addon_companion_symlinks["tog"]
+    assert os.path.abspath(fx) in recorded
+    assert os.path.abspath(inc) in recorded
 
 
 def test_remove_addon_drops_companion_symlinks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -422,7 +477,7 @@ def test_remove_addon_drops_companion_symlinks(tmp_path: Path, monkeypatch: pyte
         desired_plugin_addon_ids={"myaddon"},
         catalog_by_id=cat,
     )
-    link = game / "reshade-shaders" / "Shaders" / "addons" / "myaddon" / "companion.fx"
+    link = game / "reshade-shaders" / "Shaders" / "companion.fx"
     assert link.is_symlink()
 
     apply_plugin_addon_installation(

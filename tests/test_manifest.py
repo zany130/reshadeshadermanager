@@ -25,7 +25,7 @@ def test_manifest_roundtrip(tmp_path: Path, monkeypatch) -> None:
         symlinks_by_repo_id={"quint": ["/tmp/a", "/tmp/b"]},
         enabled_plugin_addon_ids=["swapchain-override"],
         plugin_addon_root_copies={"swapchain-override": ["swapchain_override.addon64"]},
-        plugin_addon_companion_symlinks={"swapchain-override": ["/game/reshade-shaders/Shaders/addons/x/a.fx"]},
+        plugin_addon_companion_symlinks={"swapchain-override": ["/game/reshade-shaders/Shaders/a.fx"]},
     )
     save_game_manifest(paths, m)
     preferred = new_manifest_path_for_game(paths, game_dir, None)
@@ -39,7 +39,7 @@ def test_manifest_roundtrip(tmp_path: Path, monkeypatch) -> None:
     assert m2.enabled_plugin_addon_ids == ["swapchain-override"]
     assert m2.plugin_addon_root_copies["swapchain-override"] == ["swapchain_override.addon64"]
     assert m2.plugin_addon_companion_symlinks["swapchain-override"] == [
-        "/game/reshade-shaders/Shaders/addons/x/a.fx"
+        "/game/reshade-shaders/Shaders/a.fx"
     ]
 
 
