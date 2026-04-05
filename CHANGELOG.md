@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.7.1
+
+### Fixed
+
+- **AppImage / desktop integration:** The packaged `.desktop` file is named `io.github.rsm.reshade_shader_manager.desktop` so its basename matches the GTK `application_id` in `main.py`. This aligns with the [GTK requirement](https://docs.gtk.org/gtk4/class.Application.html) that the desktop entry ID match the application ID, fixing missing or generic icons in the Wayland titlebar and in app menus that resolve icons via the desktop file.
+
 ## 0.7.0
 
 ### Added

@@ -52,8 +52,10 @@ cp -a "${DIST}/." "${APPDIR}/usr/bin/"
 install -m0755 "${SCRIPT_DIR}/AppRun" "${APPDIR}/AppRun"
 
 mkdir -p "${APPDIR}/usr/share/applications"
-cp "${SCRIPT_DIR}/reshade-shader-manager.desktop" "${APPDIR}/reshade-shader-manager.desktop"
-cp "${SCRIPT_DIR}/reshade-shader-manager.desktop" "${APPDIR}/usr/share/applications/reshade-shader-manager.desktop"
+# Basename must match GtkApplication application_id (see reshade_shader_manager/main.py).
+_DESKTOP="io.github.rsm.reshade_shader_manager.desktop"
+cp "${SCRIPT_DIR}/${_DESKTOP}" "${APPDIR}/${_DESKTOP}"
+cp "${SCRIPT_DIR}/${_DESKTOP}" "${APPDIR}/usr/share/applications/${_DESKTOP}"
 
 for _size in 64 128 256 512; do
   mkdir -p "${APPDIR}/usr/share/icons/hicolor/${_size}x${_size}/apps"
