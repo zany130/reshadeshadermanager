@@ -21,7 +21,7 @@ It is **inspired by** SteamTinkerLaunch (STL) behavior only; it does **not** dep
 ### Layers
 
 1. **Core (`reshade_shader_manager/core/`)**  
-   Filesystem, network, git, manifest I/O, ReShade download/extract/install, INI patching, PCGW fetch/parse, symlink projection, shared catalog fetch (`catalog_ops`), user-facing error strings (`error_format`). **No GTK imports.**
+   Filesystem, network, git, manifest I/O, ReShade download/extract/install, PCGW fetch/parse, symlink projection, shared catalog fetch (`catalog_ops`), user-facing error strings (`error_format`). **No GTK imports.** RSM does not create or edit the game’s `ReShade.ini`.
 
 2. **UI (`reshade_shader_manager/ui/`)**  
    Thin GTK 4 layer: `MainWindow`, `ShaderRepoWindow`, `LogPanel` + logging handler. Long work runs on **background threads**; UI updates via `GLib.idle_add`.
@@ -35,7 +35,7 @@ It is **inspired by** SteamTinkerLaunch (STL) behavior only; it does **not** dep
 ### Data flow (conceptual)
 
 - **Single source of truth:** JSON metadata under `~/.config/.../games/<slug>-<fp8>.json` (`GameManifest`; `fp8` = first 8 hex chars of SHA-256 of the canonical game directory), not marker files in the game tree. Pre–v0.3 `games/<full-sha256>.json` names are still found on load and migrated when touched.
-- **Filesystem** (DLLs, symlinks, `ReShade.ini`) is **derived** from manifest + user actions; repair/drift is informational only unless code explicitly rescans (minimal by design).
+- **Filesystem** (DLLs, symlinks) is **derived** from manifest + user actions; repair/drift is informational only unless code explicitly rescans (minimal by design). `ReShade.ini` is owned by ReShade, not edited by RSM.
 
 ### XDG layout
 
@@ -47,9 +47,8 @@ It is **inspired by** SteamTinkerLaunch (STL) behavior only; it does **not** dep
 
 ### Per-game tree (managed)
 
-- `<game>/ReShade.ini` — RSM patches only `EffectSearchPaths` / `TextureSearchPaths` under `[GENERAL]` (Windows-style recursive globs `.\reshade-shaders\Shaders\**` and `.\reshade-shaders\Textures\**`).
 - Proxy DLL(s) + optional `d3dcompiler_47.dll` — tracked in `installed_reshade_files`.
-- `reshade-shaders/Shaders/<repo-id>` → symlink to `.../share/.../repos/<repo-id>/Shaders` (same for `Textures/`). **Absolute** symlink targets; manifest stores **absolute paths to the symlink inodes** under the game dir (not `resolve()` through the link).
+- `reshade-shaders/Shaders/` and `Textures/` — merged per-file symlinks into global clones; manifest stores **absolute paths to symlink paths** under the game dir.
 
 ---
 
@@ -58,7 +57,7 @@ It is **inspired by** SteamTinkerLaunch (STL) behavior only; it does **not** dep
 1. **Metadata-only state** — No `enabled/` marker files; `enabled_repo_ids` + `symlinks_by_repo_id` in manifest.
 2. **`symlinks_by_repo_id`** — Map `repo_id → [absolute symlink paths]` for precise disable/remove.
 3. **Built-in repos in code** — `repos.BUILTIN_REPOS`; `repos.json` holds **user** entries only; PCGW merged at runtime from cache.
-4. **Remove ReShade** — Deletes **only** `installed_reshade_files`; does **not** remove shader symlinks, `enabled_repo_ids`, or `ReShade.ini` by default.
+4. **Remove ReShade** — Deletes **only** `installed_reshade_files`; does **not** remove shader symlinks, `enabled_repo_ids`, or delete `ReShade.ini` (existing INI is left in place).
 5. **One active ReShade runtime per game** — On **install**, previously tracked DLLs are removed from disk before copying new ones; `installed_reshade_files` is **replaced** (no multi-runtime merge).
 6. **`latest` version** — Resolved from GitHub **tags** (`/repos/crosire/reshade/tags?per_page=100`), highest semver (not `releases/latest`, which 404’d). On failure, use `~/.cache/.../reshade_latest_cache.json`; else require explicit version.
 7. **DX8** — **d3d8to9** (`d3d8.dll`) + ReShade as `d3d9.dll`; cached under `data/d3d8to9/`. Upstream release is **32-bit PE only** — 64-bit arch → clear `RSMError` (no guess).
@@ -104,7 +103,6 @@ reshadeshadermanager/
 │   │   ├── plugin_addons_parse.py   # Addons.ini → stable ids + normalized rows
 │   │   ├── plugin_addons_catalog.py # Fetch/cache official Addons.ini (XDG cache)
 │   │   ├── plugin_addons_install.py # copy DLLs, ZIP fail-closed, manifest updates
-│   │   ├── ini.py             # ReShade.ini [GENERAL] search paths only
 │   │   ├── reshade.py         # GitHub tags, download, zip extract, install/remove/check
 │   │   ├── repos.py           # BUILTIN_REPOS, user repos.json, merged_catalog
 │   │   ├── pcgw.py            # MediaWiki API, parse HTML → repo list, cache
@@ -123,7 +121,6 @@ reshadeshadermanager/
 └── tests/
     ├── conftest.py
     ├── test_paths.py
-    ├── test_ini.py
     ├── test_manifest.py
     ├── test_recent_games.py
     ├── test_ui_state.py

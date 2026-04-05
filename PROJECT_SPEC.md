@@ -118,7 +118,6 @@ config.json
 {
   "default_reshade_version": "latest",
   "default_variant": "standard",
-  "create_ini_if_missing": true,
   "shader_download_enabled": true,
   "pcgw_cache_ttl_hours": 24
 }
@@ -261,10 +260,7 @@ Rules
 
 ⚙️ ReShade.ini
 
-EffectSearchPaths=.\reshade-shaders\Shaders\**
-TextureSearchPaths=.\reshade-shaders\Textures\**
-
-Recursive lookup is required.
+RSM does **not** create or edit `ReShade.ini`. Configure search paths in ReShade’s own UI or by editing the INI ReShade writes.
 
 ---
 
@@ -302,7 +298,6 @@ core/
   targets.py
   manifest.py
   reshade.py
-  ini.py
   repos.py
   git_sync.py
   link_farm.py

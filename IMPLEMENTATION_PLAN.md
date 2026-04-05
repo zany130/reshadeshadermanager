@@ -4,6 +4,8 @@ This document is the **authoritative implementation plan** for *reshade-shader-m
 
 **Reference:** `PROJECT_SPEC.md` (product goals and non-goals).
 
+**v1.0 note:** RSM **no longer** implements `ini.py` or any `ReShade.ini` create/edit behavior (including `EffectSearchPaths` / `TextureSearchPaths`). ReShade owns its INI at runtime. **Remove ReShade** still leaves an existing `ReShade.ini` in place. Sections below that describe INI patching are **historical** unless marked updated.
+
 ---
 
 ## 0. Locked decisions (do not revisit without explicit change)
@@ -27,10 +29,9 @@ This document is the **authoritative implementation plan** for *reshade-shader-m
    - **`repos.json`:** **user-added** repos only (persisted).  
    - **PCGamingWiki:** fetched/parsed, stored in **cache** (`~/.cache/.../pcgw_repos.json`); merged **at runtime** with built-in + user. User repos win on `id` collision per spec.
 
-4. **`ReShade.ini` (v0.1)**  
-   - Manage **only** RSM-owned search-path entries (`EffectSearchPaths`, `TextureSearchPaths` per spec’s recursive pattern).  
-   - **Preserve** all other keys/sections.  
-   - **Do not** delete `ReShade.ini` on ReShade uninstall by default.
+4. **`ReShade.ini` (v0.1; INI editing removed in v1.0)**  
+   - RSM does **not** create or patch `ReShade.ini` anymore.  
+   - **Do not** delete `ReShade.ini` on ReShade uninstall (still the rule when removing binaries only).
 
 5. **DirectX 8**  
    If full DX8 support (e.g. multiple DLLs / d3d8to9 policy) adds too much complexity, **defer implementation** for v0.1 while keeping **`dx8` in the UI and in the data model** (`graphics_api` enum). Runtime behavior for `dx8`: clear “not implemented” path (message + no install) until a later version.
@@ -53,12 +54,8 @@ This document is the **authoritative implementation plan** for *reshade-shader-m
    - If lookup fails, fall back to the **last successfully cached** resolved version in `~/.cache/reshade-shader-manager/reshade_latest_cache.json`.  
    - If there is no cache, **require an explicit version** and raise / surface a **clear error** (no silent fallback).
 
-3. **INI merge strategy (v0.1)**  
-   - If `EffectSearchPaths` exists (in the active INI parsing model), **replace only its value** (same key line).  
-   - If `TextureSearchPaths` exists, **replace only its value**.  
-   - If either key is missing, **add** it (under `[GENERAL]`; create `[GENERAL]` if needed).  
-   - Preserve **all** other INI content.  
-   - Do **not** add marker comments or a dedicated “managed block” in v0.1.
+3. **INI merge strategy (v0.1; removed in v1.0)**  
+   - Historical: RSM previously patched only two keys under `[GENERAL]`. This behavior is **not** implemented in current releases.
 
 4. **Unsupported repo layout**  
    - If a repo has **neither** `Shaders` nor `Textures` at the clone root (case-insensitive directory names), **log a warning** and **skip** enabling that repo in v0.1.
@@ -95,7 +92,6 @@ reshade_shader_manager/
 │   ├── targets.py          # GameTarget: paths, arch, API, variant
 │   ├── manifest.py         # Per-game JSON load/save, validation, atomic write
 │   ├── reshade.py          # Download, extract, install/remove/check/update
-│   ├── ini.py              # RSM-owned ReShade.ini lines only; preserve rest
 │   ├── repos.py            # Built-in (code) + user repos.json + runtime merge w/ PCGW
 │   ├── pcgw.py             # Fetch, TTL, parse → cache file; no overwrite of repos.json
 │   ├── git_sync.py         # clone/pull under ~/.local/share/.../repos/<id>
@@ -120,7 +116,6 @@ Tests: `tests/core/...` (recommended alongside steps below).
 | `manifest.py` | Per-game JSON under `games/{slug}-{fp8}.json` (v0.3+), with lazy migration from `games/<sha256>.json` on load/save; atomic writes; validate `symlinks_by_repo_id`, `enabled_repo_ids`, installed files; manifest content is source of truth (not a directory listing). |
 | `targets.py` | Canonical absolute `game_dir`, optional `game_exe`, PE arch → `reshade_arch`; holds selected `graphics_api` / `reshade_variant` for calls into `reshade.py`. |
 | `reshade.py` | Version resolution, download to data `reshade/downloads/`, extract to `reshade/extracted/<version>/`, API→DLL mapping, copy files, update `installed_reshade_files`; remove/check; **DX8: stub only** until implemented. |
-| `ini.py` | Read INI; patch **only** managed search-path keys; leave all other content unchanged; honor `create_ini_if_missing`. Never delete INI on uninstall (default). |
 | `repos.py` | Export built-in list from code; read/write **user-only** `repos.json`; `merged_catalog()` = built-in ∪ user ∪ PCGW (PCGW from `pcgw.py` reader); collision: user wins. |
 | `pcgw.py` | Network fetch + parse; write `~/.cache/.../pcgw_repos.json` with TTL from config; stale cache on failure. |
 | `git_sync.py` | `clone_or_pull(data_dir/repos/<id>, url)`. |
@@ -193,7 +188,7 @@ If `Shaders` or `Textures` is missing in the clone, **only create the symlink(s)
 
 ### `config.json`
 
-Same as prior plan: `default_reshade_version`, `default_variant` (`standard`|`addon`), `create_ini_if_missing`, `shader_download_enabled`, `pcgw_cache_ttl_hours`.  
+Same as prior plan: `default_reshade_version`, `default_variant` (`standard`|`addon`), `shader_download_enabled`, `pcgw_cache_ttl_hours`.  
 `additionalProperties: false` at top level.
 
 ### `repos.json` (user only)

@@ -6,6 +6,10 @@ All notable changes to this project are documented in this file.
 
 Release-candidate stabilization: clarity, consistency, and regression coverage—no new major features.
 
+### Removed
+
+- **ReShade.ini management:** RSM no longer creates or edits `ReShade.ini` (including `EffectSearchPaths` / `TextureSearchPaths`). ReShade owns its own config at runtime. Removed `reshade_shader_manager.core.ini`, the `create_ini_if_missing` app setting (still ignored if present in an older `config.json`), and `tests/test_ini.py`.
+
 ### Changed
 
 - **CLI (`rsm`):** Clearer subcommand descriptions; `--game-dir` documented consistently with `DIR` metavar; `--help` epilog documents exit codes (`0` / `1` / `2` / `130`). `GameManifest` import fixed for type accuracy; `ValueError` paths use the same exception formatter as other user-facing errors.

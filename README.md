@@ -2,7 +2,7 @@
 
 Standalone Linux tool to manage:
 
-- ReShade installation/update/removal (binary + `ReShade.ini` search paths)
+- ReShade installation/update/removal (proxy DLLs only; ReShade manages its own `ReShade.ini`)
 - Git-based shader repositories (clone/pull)
 - Per-game shader enable/disable via directory symlinks
 
@@ -99,15 +99,14 @@ Backend uses these defaults:
 
 Per-game projection happens under:
 
-- `<game>/ReShade.ini`
 - `<game>/<ReShade proxy dll>.dll` + optional `d3dcompiler_47.dll`
-- `<game>/reshade-shaders/Shaders/<repo-id>` and `.../Textures/<repo-id>` — usually *directory* symlinks; non-standard repos may use per-file symlinks preserving paths
+- `<game>/reshade-shaders/Shaders/` and `.../Textures/` — merged tree of per-file symlinks (see link farm); RSM does not create or edit `ReShade.ini`
 
 ## Notes / limitations
 
 - RSM supports **one active ReShade install state per game directory** (reinstall replaces the tracked proxy binaries list; no multi-runtime merging).
 - **DirectX 8** uses **d3d8to9** (`d3d8.dll`) plus ReShade as **`d3d9.dll`**. The pinned crosire release currently ships a **32-bit** `d3d8.dll` only; **64-bit games** get a clear error at install time.
-- “Remove ReShade” is binary-only: it deletes files tracked in `installed_reshade_files` and does **not** remove shader symlinks, enabled repo state, or `ReShade.ini` by default.
+- “Remove ReShade” is binary-only: it deletes files tracked in `installed_reshade_files` and does **not** remove shader symlinks, enabled repo state, or `ReShade.ini` (existing `ReShade.ini` is left in place).
 
 ## Packaging
 
