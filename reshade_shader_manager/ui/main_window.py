@@ -63,6 +63,7 @@ class MainWindow(Gtk.ApplicationWindow):
             default_width=dw,
             default_height=dh,
         )
+        self.set_icon_name("reshade-shader-manager")
         self._paths = paths
         self._config = cfg
         self._pending_maximize = bool(ui and ui.maximized)
