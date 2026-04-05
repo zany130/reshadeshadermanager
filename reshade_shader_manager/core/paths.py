@@ -79,7 +79,7 @@ class RsmPaths:
         return self.data_dir / "reshade" / "extracted" / version
 
     def cached_d3dcompiler_path(self) -> Path:
-        """Cached ``d3dcompiler_47.dll`` copied from a ReShade installer (fallback when extract layout omits it)."""
+        """Cached ``d3dcompiler_47.dll`` downloaded from the Lutris tools mirror (not from ReShade)."""
         return self.data_dir / "reshade" / "d3dcompiler_47.dll"
 
     def pcgw_cache_path(self) -> Path:

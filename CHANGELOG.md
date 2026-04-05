@@ -6,7 +6,7 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
-- **ReShade / Wine:** Ensure `d3dcompiler_47.dll` is present in the game directory when it is missing (from the ReShade installer extract or a cached copy under XDG data). Does not overwrite an existing file. The DLL is not tracked in `installed_reshade_files` and is not removed when removing ReShade binaries.
+- **ReShade / Wine:** Ensure `d3dcompiler_47.dll` is present when missing by downloading from the Lutris tools mirror (`https://lutris.net/files/tools/dll/d3dcompiler_47.dll`, same stable URL as SteamTinkerLaunch), caching under XDG data, and copying next to the game. The ReShade installer does not ship this DLL. Does not overwrite an existing file. The DLL is not tracked in `installed_reshade_files` and is not removed when removing ReShade binaries.
 
 ## 1.0.0
 

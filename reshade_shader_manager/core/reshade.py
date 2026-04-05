@@ -22,6 +22,8 @@ log = logging.getLogger(__name__)
 
 RESHADE_GITHUB_TAGS_API = "https://api.github.com/repos/crosire/reshade/tags?per_page=100"
 RESHADE_DOWNLOAD_BASE = "https://reshade.me/downloads"
+# Stable mirror used by Lutris / SteamTinkerLaunch for the D3D compiler DLL (ReShade does not ship it).
+D3DCOMPILER_47_DOWNLOAD_URL = "https://lutris.net/files/tools/dll/d3dcompiler_47.dll"
 USER_AGENT = "reshade-shader-manager/0.1"
 
 # HLSL / D3D compile support for ReShade under Wine/Proton; never tracked in manifest (see install/remove).
@@ -183,15 +185,38 @@ def _extract_has_payload(extract_root: Path) -> bool:
     return False
 
 
-def _ensure_d3dcompiler_47(
-    game_dir: Path,
-    *,
-    d3d_src_from_extract: Path | None,
-    extract_root: Path,
-    paths: RsmPaths,
-) -> None:
+def _download_d3dcompiler_47_to_cache(paths: RsmPaths) -> Path:
     """
-    If ``<game_dir>/d3dcompiler_47.dll`` is missing, copy from the ReShade extract or XDG cache.
+    Ensure ``d3dcompiler_47.dll`` exists under XDG data (download from Lutris mirror if missing).
+
+    ReShade installers do not include this DLL; Wine/Proton need it beside the game for HLSL.
+    """
+    dest = paths.cached_d3dcompiler_path()
+    if dest.is_file() and dest.stat().st_size > 0:
+        return dest
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    req = urllib.request.Request(
+        D3DCOMPILER_47_DOWNLOAD_URL,
+        headers={"User-Agent": USER_AGENT},
+        method="GET",
+    )
+    log.info("Downloading %s", D3DCOMPILER_47_DOWNLOAD_URL)
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310 — fixed upstream URL
+            tmp.write_bytes(resp.read())
+    except (OSError, urllib.error.URLError, urllib.error.HTTPError) as e:
+        tmp.unlink(missing_ok=True)
+        raise RSMError(
+            f"Failed to download {_D3D_COMPILER_BASENAME} from {D3DCOMPILER_47_DOWNLOAD_URL}: {e}"
+        ) from e
+    tmp.replace(dest)
+    return dest
+
+
+def _ensure_d3dcompiler_47(game_dir: Path, paths: RsmPaths) -> None:
+    """
+    If ``<game_dir>/d3dcompiler_47.dll`` is missing, copy from XDG cache (downloading first if needed).
 
     Does not overwrite an existing file. Does not add the DLL to ``installed_reshade_files`` so
     uninstall does not remove it (one-way ensure for Proton/Wine compatibility).
@@ -200,43 +225,18 @@ def _ensure_d3dcompiler_47(
     if dest.exists():
         return
 
-    src = d3d_src_from_extract if (d3d_src_from_extract and d3d_src_from_extract.is_file()) else None
-    if src is None:
-        for p in extract_root.rglob(_D3D_COMPILER_BASENAME):
-            if p.is_file():
-                src = p
-                break
-    if src is None:
-        cache = paths.cached_d3dcompiler_path()
-        if cache.is_file():
-            src = cache
-    if src is None:
-        log.warning(
-            "Could not locate %s in ReShade installer or cache; Proton/Wine may need it manually.",
-            _D3D_COMPILER_BASENAME,
-        )
-        return
-
-    shutil.copy2(src, dest)
-    try:
-        cache = paths.cached_d3dcompiler_path()
-        cache.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, cache)
-    except OSError as e:
-        log.debug("Could not refresh %s cache: %s", _D3D_COMPILER_BASENAME, e)
-    log.info("Installed %s for ReShade compatibility", _D3D_COMPILER_BASENAME)
+    cache = _download_d3dcompiler_47_to_cache(paths)
+    shutil.copy2(cache, dest)
+    log.info("Installed d3dcompiler_47.dll for ReShade compatibility")
 
 
-def find_payload_dlls(extract_root: Path, arch: str) -> tuple[Path, Path | None]:
-    """Return ``(ReShade{32|64}.dll path, d3dcompiler_47.dll or None)``."""
+def find_payload_dlls(extract_root: Path, arch: str) -> Path:
+    """Return path to ``ReShade{32|64}.dll`` under the installer extract."""
     name = "ReShade64.dll" if arch == "64" else "ReShade32.dll"
     matches = [p for p in extract_root.rglob(name) if p.is_file()]
     if not matches:
         raise RSMError(f"{name} not found under {extract_root}")
-    reshade_dll = _pick_shortest(matches)
-    d3d_matches = [p for p in extract_root.rglob(_D3D_COMPILER_BASENAME) if p.is_file()]
-    d3d = _pick_shortest(d3d_matches) if d3d_matches else None
-    return reshade_dll, d3d
+    return _pick_shortest(matches)
 
 
 def install_reshade(
@@ -258,9 +258,9 @@ def install_reshade(
     **DX8:** installs crosire ``d3d8to9`` as ``d3d8.dll`` and ReShade as ``d3d9.dll`` (32-bit games only
     with current upstream release).
 
-    ``d3dcompiler_47.dll`` is ensured next to the proxy if missing (from the installer or cache);
-    it is **not** listed in ``installed_reshade_files`` and is **not** removed by
-    :func:`remove_reshade_binaries`.
+    ``d3dcompiler_47.dll`` is not part of the ReShade installer; it is downloaded when missing
+    (Lutris mirror), cached under XDG data, and copied next to the proxy. It is **not** listed in
+    ``installed_reshade_files`` and is **not** removed by :func:`remove_reshade_binaries`.
 
     Does not create or edit ``ReShade.ini`` (ReShade manages that at runtime). Does not clear
     shader symlinks or ``enabled_repo_ids``.
@@ -286,7 +286,7 @@ def install_reshade(
     extdir = paths.reshade_extract_dir(resolved)
     if not _extract_has_payload(extdir):
         extract_reshade_installer(exe, extdir)
-    reshade_src, d3d_src = find_payload_dlls(extdir, manifest.reshade_arch)
+    reshade_src = find_payload_dlls(extdir, manifest.reshade_arch)
     dest_name = proxy_dll_for_api(api)
 
     installed: list[str] = []
@@ -296,7 +296,7 @@ def install_reshade(
         installed.append(DX8_WRAPPER_BASENAME)
     shutil.copy2(reshade_src, game_dir / dest_name)
     installed.append(dest_name)
-    _ensure_d3dcompiler_47(game_dir, d3d_src_from_extract=d3d_src, extract_root=extdir, paths=paths)
+    _ensure_d3dcompiler_47(game_dir, paths)
 
     manifest.reshade_version = resolved
     manifest.reshade_variant = "addon" if addon else "standard"

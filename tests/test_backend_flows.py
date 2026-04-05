@@ -36,7 +36,6 @@ def _minimal_reshade_zip_bytes() -> bytes:
         zf.writestr("ReShade64.dll", b"MZ" + b"\0" * 120)
         zf.writestr("ReShade32.dll", b"MZ" + b"\0" * 120)
         zf.writestr("nested/x/ReShade64.dll", b"MZnested")
-        zf.writestr("d3dcompiler_47.dll", b"compiler")
     return buf.getvalue()
 
 
@@ -50,7 +49,7 @@ def _minimal_reshade_zip_bytes_no_d3dcompiler() -> bytes:
 
 
 @pytest.fixture
-def fake_download(monkeypatch: pytest.MonkeyPatch) -> None:
+def fake_download(monkeypatch: pytest.MonkeyPatch, rsm_paths: RsmPaths) -> None:
     def _fake(version: str, paths: RsmPaths, *, addon: bool) -> Path:
         dest = paths.reshade_download_path(version, addon=addon)
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -58,6 +57,10 @@ def fake_download(monkeypatch: pytest.MonkeyPatch) -> None:
         return dest
 
     monkeypatch.setattr(reshade_mod, "download_reshade_installer", _fake)
+    # ReShade does not ship d3dcompiler_47.dll; avoid network by seeding the same cache path as download.
+    c = rsm_paths.cached_d3dcompiler_path()
+    c.parent.mkdir(parents=True, exist_ok=True)
+    c.write_bytes(b"stub-d3d")
 
 
 @pytest.fixture
@@ -156,6 +159,43 @@ def test_d3dcompiler_uses_cache_when_absent_from_extract(
     p = game / "d3dcompiler_47.dll"
     assert p.is_file()
     assert p.read_bytes() == b"cached-copy"
+
+
+def test_d3dcompiler_downloads_via_helper_when_cache_empty(
+    tmp_path: Path, rsm_paths: RsmPaths, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When XDG cache has no DLL, _download_d3dcompiler_47_to_cache must run (mocked)."""
+
+    def _fake_dl(paths: RsmPaths) -> Path:
+        p = paths.cached_d3dcompiler_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(b"from-helper")
+        return p
+
+    monkeypatch.setattr(reshade_mod, "_download_d3dcompiler_47_to_cache", _fake_dl)
+
+    def _fake_installer(version: str, paths: RsmPaths, *, addon: bool) -> Path:
+        dest = paths.reshade_download_path(version, addon=addon)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(_minimal_reshade_zip_bytes_no_d3dcompiler())
+        return dest
+
+    monkeypatch.setattr(reshade_mod, "download_reshade_installer", _fake_installer)
+
+    game = tmp_path / "game_dl"
+    game.mkdir(parents=True)
+    m = new_game_manifest(game)
+    m.reshade_arch = "64"
+    install_reshade(
+        paths=rsm_paths,
+        manifest=m,
+        graphics_api="dx11",
+        reshade_version="9.9.9-dl",
+        variant="standard",
+    )
+    p = game / "d3dcompiler_47.dll"
+    assert p.is_file()
+    assert p.read_bytes() == b"from-helper"
 
 
 def test_d3dcompiler_not_overwritten_if_already_present(
