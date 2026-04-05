@@ -178,7 +178,6 @@ def _cmd_reshade_install(args: argparse.Namespace) -> int:
         graphics_api=m.graphics_api,
         reshade_version=ver,
         variant=m.reshade_variant,
-        create_ini_if_missing=cfg.create_ini_if_missing,
     )
     print(f"ReShade installed ({m.reshade_version}).", file=sys.stdout)
     return EXIT_OK
@@ -198,7 +197,11 @@ def _cmd_reshade_remove(_args: argparse.Namespace) -> int:
     warnings = remove_reshade_binaries(paths=paths, manifest=m)
     for w in warnings:
         print(w, file=sys.stderr)
-    print("Removed ReShade binaries (INI and shader links unchanged).", file=sys.stdout)
+    print(
+        "ReShade binaries were removed. Existing ReShade.ini was left in place; "
+        "shader symlinks and saved repo state were unchanged.",
+        file=sys.stdout,
+    )
     return EXIT_OK
 
 

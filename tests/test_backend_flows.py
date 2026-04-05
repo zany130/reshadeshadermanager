@@ -16,7 +16,6 @@ from pathlib import Path
 import pytest
 
 from reshade_shader_manager.core import reshade as reshade_mod
-from reshade_shader_manager.core.ini import DEFAULT_EFFECT_SEARCH, DEFAULT_TEXTURE_SEARCH
 import shutil
 
 from reshade_shader_manager.core.link_farm import (
@@ -103,16 +102,12 @@ def test_install_remove_reshade_flow(
         graphics_api="dx11",
         reshade_version="9.9.9-test",
         variant="standard",
-        create_ini_if_missing=True,
     )
     m2 = load_game_manifest(rsm_paths, game)
     assert m2 is not None
     assert m2.installed_reshade_files == ["dxgi.dll", "d3dcompiler_47.dll"]
     assert (game / "dxgi.dll").is_file()
     assert (game / "d3dcompiler_47.dll").is_file()
-    ini = (game / "ReShade.ini").read_text(encoding="utf-8")
-    assert DEFAULT_EFFECT_SEARCH in ini
-    assert DEFAULT_TEXTURE_SEARCH in ini
 
     warn = remove_reshade_binaries(paths=rsm_paths, manifest=m2)
     assert warn == []
@@ -120,7 +115,6 @@ def test_install_remove_reshade_flow(
     assert m3 is not None
     assert m3.installed_reshade_files == []
     assert not (game / "dxgi.dll").exists()
-    assert (game / "ReShade.ini").is_file()
 
 
 def test_reinstall_replaces_proxy_and_manifest_list(
@@ -137,7 +131,6 @@ def test_reinstall_replaces_proxy_and_manifest_list(
         graphics_api="dx11",
         reshade_version="9.9.9-a",
         variant="standard",
-        create_ini_if_missing=True,
     )
     assert (game / "dxgi.dll").is_file()
     m_reload = load_game_manifest(rsm_paths, game)
@@ -148,7 +141,6 @@ def test_reinstall_replaces_proxy_and_manifest_list(
         graphics_api="opengl",
         reshade_version="9.9.9-b",
         variant="standard",
-        create_ini_if_missing=True,
     )
     assert not (game / "dxgi.dll").exists()
     assert (game / "opengl32.dll").is_file()
@@ -483,7 +475,6 @@ def test_remove_reshade_leaves_shaders_and_enabled(
         graphics_api="dx11",
         reshade_version="9.9.9-m",
         variant="standard",
-        create_ini_if_missing=True,
     )
     m_loaded = load_game_manifest(rsm_paths, game)
     assert m_loaded is not None

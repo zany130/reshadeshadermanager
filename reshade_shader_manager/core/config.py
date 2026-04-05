@@ -14,7 +14,6 @@ from reshade_shader_manager.core.paths import RsmPaths
 class AppConfig:
     default_reshade_version: str = "latest"
     default_variant: str = "standard"  # "standard" | "addon"
-    create_ini_if_missing: bool = True
     shader_download_enabled: bool = True
     pcgw_cache_ttl_hours: float = 24.0
     plugin_addons_catalog_ttl_hours: float = 24.0
@@ -33,13 +32,14 @@ class AppConfig:
     @staticmethod
     def from_mapping(m: Mapping[str, Any]) -> AppConfig:
         allowed = {f.name for f in fields(AppConfig)}
-        extra = set(m.keys()) - allowed
+        # v1.0: create_ini_if_missing removed; ignore if present in older config.json
+        obsolete = frozenset({"create_ini_if_missing"})
+        extra = set(m.keys()) - allowed - obsolete
         if extra:
             raise ValueError(f"unknown config keys: {sorted(extra)}")
         return AppConfig(
             default_reshade_version=str(m.get("default_reshade_version", AppConfig.default_reshade_version)),
             default_variant=str(m.get("default_variant", AppConfig.default_variant)),
-            create_ini_if_missing=bool(m.get("create_ini_if_missing", AppConfig.create_ini_if_missing)),
             shader_download_enabled=bool(m.get("shader_download_enabled", AppConfig.shader_download_enabled)),
             pcgw_cache_ttl_hours=float(m.get("pcgw_cache_ttl_hours", AppConfig.pcgw_cache_ttl_hours)),
             plugin_addons_catalog_ttl_hours=float(

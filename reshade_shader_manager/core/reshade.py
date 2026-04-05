@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Any
 
 from reshade_shader_manager.core.exceptions import RSMError, VersionResolutionError
-from reshade_shader_manager.core.ini import ensure_search_paths_in_ini
 from reshade_shader_manager.core.manifest import GameManifest, save_game_manifest
 from reshade_shader_manager.core.paths import RsmPaths
 from reshade_shader_manager.core.d3d8to9 import ensure_d3d8to9_dll
@@ -200,7 +199,6 @@ def install_reshade(
     graphics_api: str,
     reshade_version: str,
     variant: str,
-    create_ini_if_missing: bool,
 ) -> GameManifest:
     """
     Install ReShade proxy + optional d3dcompiler into ``manifest.game_dir`` and update manifest.
@@ -213,7 +211,8 @@ def install_reshade(
     **DX8:** installs crosire ``d3d8to9`` as ``d3d8.dll`` and ReShade as ``d3d9.dll`` (32-bit games only
     with current upstream release).
 
-    Does not clear shader symlinks or ``enabled_repo_ids``. Does not delete ``ReShade.ini``.
+    Does not create or edit ``ReShade.ini`` (ReShade manages that at runtime). Does not clear
+    shader symlinks or ``enabled_repo_ids``.
     """
     api = GraphicsAPI(graphics_api)
 
@@ -253,18 +252,14 @@ def install_reshade(
     manifest.graphics_api = graphics_api
     manifest.installed_reshade_files = installed
 
-    ensure_search_paths_in_ini(
-        game_dir,
-        create_if_missing=create_ini_if_missing,
-    )
     save_game_manifest(paths, manifest)
     return manifest
 
 
 def remove_reshade_binaries(*, paths: RsmPaths, manifest: GameManifest) -> list[str]:
     """
-    Remove only files listed in ``installed_reshade_files``; do not touch INI,
-    symlinks, or ``enabled_repo_ids``. Returns warnings for missing files.
+    Remove only files listed in ``installed_reshade_files``; do not delete ``ReShade.ini``,
+    shader symlinks, or ``enabled_repo_ids``. Returns warnings for missing files.
     """
     game_dir = Path(manifest.game_dir)
     warnings: list[str] = []

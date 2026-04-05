@@ -501,7 +501,6 @@ class MainWindow(Gtk.ApplicationWindow):
                 graphics_api=m.graphics_api,
                 reshade_version=ver,
                 variant=m.reshade_variant,
-                create_ini_if_missing=self._config.create_ini_if_missing,
             )
 
         def ok(_r) -> None:
@@ -537,7 +536,6 @@ class MainWindow(Gtk.ApplicationWindow):
                 graphics_api=m.graphics_api,
                 reshade_version="latest",
                 variant=m.reshade_variant,
-                create_ini_if_missing=self._config.create_ini_if_missing,
             )
 
         def ok(result: GameManifest) -> None:
@@ -572,7 +570,10 @@ class MainWindow(Gtk.ApplicationWindow):
         def ok(warnings: list[str]) -> None:
             for w in warnings:
                 log.warning("%s", w)
-            self._show_info("Removed ReShade binaries (INI and shader links unchanged).")
+            self._show_info(
+                "ReShade binaries were removed. Existing ReShade.ini was left in place; "
+                "shader symlinks and saved repo state were unchanged."
+            )
 
         def err(e: BaseException) -> None:
             self._show_error(format_exception_for_ui(e))
