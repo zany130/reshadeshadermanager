@@ -149,17 +149,19 @@ class ShaderRepoWindow(Gtk.Window):
                 GLib.idle_add(dispatch_ok)
             except RSMError as e:
                 log.warning("Shader apply failed: %s", e)
+                exc = e
 
                 def dispatch_err() -> bool:
-                    err(e)
+                    err(exc)
                     return False
 
                 GLib.idle_add(dispatch_err)
             except Exception as e:  # noqa: BLE001
                 log.exception("Shader apply failed")
+                exc = e
 
                 def dispatch_err() -> bool:
-                    err(e)
+                    err(exc)
                     return False
 
                 GLib.idle_add(dispatch_err)

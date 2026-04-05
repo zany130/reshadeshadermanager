@@ -175,17 +175,19 @@ class PluginAddonWindow(Gtk.Window):
                 GLib.idle_add(dispatch_ok)
             except RSMError as e:
                 log.warning("Plugin add-on apply failed: %s", e)
+                exc = e
 
                 def dispatch_err() -> bool:
-                    err(e)
+                    err(exc)
                     return False
 
                 GLib.idle_add(dispatch_err)
             except Exception as e:  # noqa: BLE001
                 log.exception("Plugin add-on apply failed")
+                exc = e
 
                 def dispatch_err() -> bool:
-                    err(e)
+                    err(exc)
                     return False
 
                 GLib.idle_add(dispatch_err)
