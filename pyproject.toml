@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "reshade-shader-manager"
-version = "1.0.0"
+version = "1.0.1"
 description = "Standalone ReShade and shader-repo manager for Linux (GTK 4 UI + CLI)"
 readme = "README.md"
 requires-python = ">=3.10"

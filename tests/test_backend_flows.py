@@ -40,6 +40,15 @@ def _minimal_reshade_zip_bytes() -> bytes:
     return buf.getvalue()
 
 
+def _minimal_reshade_zip_bytes_no_d3dcompiler() -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("ReShade64.dll", b"MZ" + b"\0" * 120)
+        zf.writestr("ReShade32.dll", b"MZ" + b"\0" * 120)
+        zf.writestr("nested/x/ReShade64.dll", b"MZnested")
+    return buf.getvalue()
+
+
 @pytest.fixture
 def fake_download(monkeypatch: pytest.MonkeyPatch) -> None:
     def _fake(version: str, paths: RsmPaths, *, addon: bool) -> Path:
@@ -105,7 +114,7 @@ def test_install_remove_reshade_flow(
     )
     m2 = load_game_manifest(rsm_paths, game)
     assert m2 is not None
-    assert m2.installed_reshade_files == ["dxgi.dll", "d3dcompiler_47.dll"]
+    assert m2.installed_reshade_files == ["dxgi.dll"]
     assert (game / "dxgi.dll").is_file()
     assert (game / "d3dcompiler_47.dll").is_file()
 
@@ -115,6 +124,57 @@ def test_install_remove_reshade_flow(
     assert m3 is not None
     assert m3.installed_reshade_files == []
     assert not (game / "dxgi.dll").exists()
+    assert (game / "d3dcompiler_47.dll").is_file()
+
+
+def test_d3dcompiler_uses_cache_when_absent_from_extract(
+    tmp_path: Path, rsm_paths: RsmPaths, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache = rsm_paths.cached_d3dcompiler_path()
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_bytes(b"cached-copy")
+
+    def _fake(version: str, paths: RsmPaths, *, addon: bool) -> Path:
+        dest = paths.reshade_download_path(version, addon=addon)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(_minimal_reshade_zip_bytes_no_d3dcompiler())
+        return dest
+
+    monkeypatch.setattr(reshade_mod, "download_reshade_installer", _fake)
+
+    game = tmp_path / "game_nod3d"
+    game.mkdir(parents=True)
+    m = new_game_manifest(game)
+    m.reshade_arch = "64"
+    install_reshade(
+        paths=rsm_paths,
+        manifest=m,
+        graphics_api="dx11",
+        reshade_version="9.9.9-nod3d",
+        variant="standard",
+    )
+    p = game / "d3dcompiler_47.dll"
+    assert p.is_file()
+    assert p.read_bytes() == b"cached-copy"
+
+
+def test_d3dcompiler_not_overwritten_if_already_present(
+    tmp_path: Path, rsm_paths: RsmPaths, fake_download: None
+) -> None:
+    game = tmp_path / "game_keepd3d"
+    game.mkdir(parents=True)
+    existing = game / "d3dcompiler_47.dll"
+    existing.write_bytes(b"user-provided")
+    m = new_game_manifest(game)
+    m.reshade_arch = "64"
+    install_reshade(
+        paths=rsm_paths,
+        manifest=m,
+        graphics_api="dx11",
+        reshade_version="9.9.9-test",
+        variant="standard",
+    )
+    assert existing.read_bytes() == b"user-provided"
 
 
 def test_reinstall_replaces_proxy_and_manifest_list(
@@ -146,7 +206,8 @@ def test_reinstall_replaces_proxy_and_manifest_list(
     assert (game / "opengl32.dll").is_file()
     m2 = load_game_manifest(rsm_paths, game)
     assert m2 is not None
-    assert m2.installed_reshade_files == ["opengl32.dll", "d3dcompiler_47.dll"]
+    assert m2.installed_reshade_files == ["opengl32.dll"]
+    assert (game / "d3dcompiler_47.dll").is_file()
 
 
 def test_apply_rebuild_recreates_symlinks_after_manual_delete(

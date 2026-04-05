@@ -78,6 +78,10 @@ class RsmPaths:
     def reshade_extract_dir(self, version: str) -> Path:
         return self.data_dir / "reshade" / "extracted" / version
 
+    def cached_d3dcompiler_path(self) -> Path:
+        """Cached ``d3dcompiler_47.dll`` copied from a ReShade installer (fallback when extract layout omits it)."""
+        return self.data_dir / "reshade" / "d3dcompiler_47.dll"
+
     def pcgw_cache_path(self) -> Path:
         return self.cache_dir / "pcgw_repos.json"
 

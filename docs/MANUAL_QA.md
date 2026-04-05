@@ -28,6 +28,7 @@ Record failures in the issue tracker or release notes.
 | Verify |
 |--------|
 | **Install** / **Check** / **Remove** (GUI or `rsm reshade …`). |
+| **`d3dcompiler_47.dll`:** After install, present if it was missing (extract or cache); never overwritten. Stays on disk after **Remove** (not treated as a managed uninstall target). |
 | After **Remove**, message indicates binaries removed and **existing `ReShade.ini` left in place** (shader/add-on state unchanged unless you changed it). |
 
 ## Plugin add-ons

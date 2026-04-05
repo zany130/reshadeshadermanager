@@ -105,6 +105,7 @@ Per-game projection happens under:
 ## Notes / limitations
 
 - RSM supports **one active ReShade install state per game directory** (reinstall replaces the tracked proxy binaries list; no multi-runtime merging).
+- **`d3dcompiler_47.dll`:** RSM **ensures** one is present next to the ReShade proxy when missing (from the ReShade installer or a cached copy) for Wine/Proton compatibility; it **does not** overwrite an existing file and **is not** removed when you **Remove ReShade** binaries.
 - **DirectX 8** uses **d3d8to9** (`d3d8.dll`) plus ReShade as **`d3d9.dll`**. The pinned crosire release currently ships a **32-bit** `d3d8.dll` only; **64-bit games** get a clear error at install time.
 - “Remove ReShade” is binary-only: it deletes files tracked in `installed_reshade_files` and does **not** remove shader symlinks, enabled repo state, or `ReShade.ini` (existing `ReShade.ini` is left in place).
 
