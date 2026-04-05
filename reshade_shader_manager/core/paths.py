@@ -43,7 +43,7 @@ class RsmPaths:
             self.data_dir / "reshade" / "extracted",
             self.data_dir / "d3d8to9",
             self.data_dir / "addons" / "downloads",
-            self.data_dir / "logs",
+            self.logs_dir(),
             self.cache_dir,
         ):
             p.mkdir(parents=True, exist_ok=True)
@@ -56,6 +56,10 @@ class RsmPaths:
 
     def repos_json(self) -> Path:
         return self.config_dir / "repos.json"
+
+    def logs_dir(self) -> Path:
+        """Session log files (``rsm.log``) under XDG data."""
+        return self.data_dir / "logs"
 
     def games_dir(self) -> Path:
         return self.config_dir / "games"

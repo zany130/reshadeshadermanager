@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 from gi.repository import GLib, Gtk
 
-if TYPE_CHECKING:
-    pass
+from reshade_shader_manager.core.paths import RsmPaths
 
 
 class LogPanel(Gtk.ScrolledWindow):
@@ -50,7 +48,47 @@ class GtkLogHandler(logging.Handler):
         GLib.idle_add(self._panel.append, msg, priority=GLib.PRIORITY_LOW)
 
 
-def setup_gui_logging(panel: LogPanel, *, level: int = logging.INFO) -> GtkLogHandler:
+def attach_file_logging(paths: RsmPaths, *, level: int = logging.INFO) -> logging.Handler | None:
+    """
+    Write session logs to ``paths.logs_dir() / rsm.log`` (UTF-8).
+
+    Idempotent: skips if the root logger already has a :class:`logging.FileHandler`
+    for that path. On ``OSError``, logs a warning and returns ``None``.
+    """
+    root = logging.getLogger()
+    log_path = paths.logs_dir() / "rsm.log"
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        resolved = str(log_path.resolve())
+    except OSError as e:
+        logging.getLogger(__name__).warning("Could not create logs directory %s: %s", log_path.parent, e)
+        return None
+
+    for h in root.handlers:
+        if isinstance(h, logging.FileHandler) and getattr(h, "baseFilename", None) == resolved:
+            return None
+
+    try:
+        fh = logging.FileHandler(log_path, encoding="utf-8")
+    except OSError as e:
+        logging.getLogger(__name__).warning("Could not open log file %s: %s", log_path, e)
+        return None
+
+    fh.setLevel(level)
+    fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    root.addHandler(fh)
+    root.setLevel(min(root.level or logging.WARNING, level))
+    return fh
+
+
+def setup_gui_logging(
+    panel: LogPanel,
+    *,
+    paths: RsmPaths | None = None,
+    level: int = logging.INFO,
+) -> GtkLogHandler:
+    if paths is not None:
+        attach_file_logging(paths, level=level)
     root = logging.getLogger()
     handler = GtkLogHandler(panel)
     handler.setLevel(level)

@@ -112,7 +112,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
         self.set_child(outer)
 
-        setup_gui_logging(self._log_panel)
+        setup_gui_logging(self._log_panel, paths=self._paths)
         log.info("RSM UI ready (config %s)", self._paths.config_dir)
 
         self._set_catalog_dependent_sensitive(False)
@@ -471,9 +471,10 @@ class MainWindow(Gtk.ApplicationWindow):
                 GLib.idle_add(dispatch_ok)
             except Exception as e:  # noqa: BLE001
                 log.exception("Background task failed")
+                exc = e
 
                 def dispatch_err() -> bool:
-                    on_err(e)
+                    on_err(exc)
                     return False
 
                 GLib.idle_add(dispatch_err)
