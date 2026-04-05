@@ -13,6 +13,10 @@ All notable changes to this project are documented in this file.
 
 - `packaging/README.md`: where AppImage icons live and how to regenerate PNGs offline.
 
+### Packaging
+
+- `build_appimage.sh` reads the AppImage filename version from `pyproject.toml` unless `RSM_APPIMAGE_VERSION` is set.
+
 ## 0.6.0
 
 ### Changed
