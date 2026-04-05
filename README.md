@@ -6,9 +6,11 @@ Standalone Linux tool to manage:
 - Git-based shader repositories (clone/pull)
 - Per-game shader enable/disable via directory symlinks
 
+App icon assets: `packaging/appimage/icons/hicolor/` (source logo: `packaging/appimage/branding/`).
+
 GTK UI (**v0.2**) is a thin frontend over a metadata-driven backend core.
 
-## Features (v0.2)
+## Features
 
 - Pick a game directory (+ optional `.exe` to detect 32/64-bit)
 - Select graphics API (`opengl`, `dx9`, `dx10`, `dx11`, `dx12`) and ReShade variant (`standard`/`addon`)
