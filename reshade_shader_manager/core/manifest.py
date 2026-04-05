@@ -11,6 +11,7 @@ from typing import Any, Mapping
 from reshade_shader_manager.core.paths import (
     RsmPaths,
     candidate_game_manifest_paths,
+    canonical_game_dir_str,
     game_dir_fingerprint8,
     legacy_game_manifest_path,
     new_manifest_path_for_game,
@@ -134,10 +135,6 @@ def manifest_path_for_game_dir(paths: RsmPaths, game_dir: str | Path) -> Path:
     return new_manifest_path_for_game(paths, game_dir, None)
 
 
-def _canonical_game_dir_str(game_dir: str | Path) -> str:
-    return str(Path(game_dir).expanduser().resolve())
-
-
 def _write_manifest_atomic(paths: RsmPaths, manifest: GameManifest, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -173,7 +170,7 @@ def load_game_manifest(
     Lazy migration: if the only match is the legacy ``{sha256}.json``, load and migrate
     to ``{slug}-{fp8}.json`` after a successful write to the new path.
     """
-    cgd = _canonical_game_dir_str(game_dir)
+    cgd = canonical_game_dir_str(game_dir)
     for path in candidate_game_manifest_paths(paths, game_dir, game_exe):
         if not path.is_file():
             continue
@@ -186,7 +183,7 @@ def load_game_manifest(
         if not isinstance(data, dict):
             continue
         try:
-            file_gd = _canonical_game_dir_str(data.get("game_dir", ""))
+            file_gd = canonical_game_dir_str(data.get("game_dir", ""))
         except OSError:
             continue
         if file_gd != cgd:
@@ -199,6 +196,12 @@ def load_game_manifest(
             log.warning("Invalid manifest %s: %s", path, e)
             continue
 
+        try:
+            m.game_dir = canonical_game_dir_str(m.game_dir)
+        except OSError as e:
+            log.warning("Skipping manifest %s: could not canonicalize game_dir: %s", path, e)
+            continue
+
         if path.resolve() == legacy_game_manifest_path(paths, game_dir).resolve():
             _migrate_legacy_manifest(paths, m, path)
         return m
@@ -207,7 +210,8 @@ def load_game_manifest(
 
 def save_game_manifest(paths: RsmPaths, manifest: GameManifest) -> None:
     manifest.validate()
-    cgd = _canonical_game_dir_str(manifest.game_dir)
+    cgd = canonical_game_dir_str(manifest.game_dir)
+    manifest.game_dir = cgd
     target = new_manifest_path_for_game(paths, cgd, manifest.game_exe)
     fp8 = game_dir_fingerprint8(cgd)
     leg = legacy_game_manifest_path(paths, cgd)
@@ -230,7 +234,7 @@ def save_game_manifest(paths: RsmPaths, manifest: GameManifest) -> None:
 
 
 def new_game_manifest(game_dir: str | Path, *, game_exe: str | None = None) -> GameManifest:
-    gd = str(Path(game_dir).expanduser().resolve())
+    gd = canonical_game_dir_str(game_dir)
     return GameManifest(
         game_dir=gd,
         game_exe=None if game_exe is None else str(Path(game_exe).expanduser().resolve()),

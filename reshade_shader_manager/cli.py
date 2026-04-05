@@ -17,7 +17,7 @@ from reshade_shader_manager.core.exceptions import RSMError, VersionResolutionEr
 from reshade_shader_manager.core.git_sync import pull_existing_clones_for_catalog
 from reshade_shader_manager.core.link_farm import apply_shader_projection
 from reshade_shader_manager.core.manifest import GameManifest, load_game_manifest, new_game_manifest
-from reshade_shader_manager.core.paths import RsmPaths, get_paths
+from reshade_shader_manager.core.paths import RsmPaths, canonical_game_dir, get_paths
 from reshade_shader_manager.core.plugin_addons_catalog import get_upstream_plugin_addons
 from reshade_shader_manager.core.plugin_addons_install import (
     apply_plugin_addon_installation,
@@ -55,7 +55,7 @@ def _load_paths_cfg() -> tuple[RsmPaths, AppConfig]:
 
 
 def _resolve_game_dir(s: str) -> Path:
-    return Path(s).expanduser().resolve()
+    return canonical_game_dir(s)
 
 
 def _resolve_manifest(

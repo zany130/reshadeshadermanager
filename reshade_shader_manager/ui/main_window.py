@@ -17,7 +17,7 @@ from reshade_shader_manager.core.manifest import (
     new_game_manifest,
     save_game_manifest,
 )
-from reshade_shader_manager.core.paths import get_paths
+from reshade_shader_manager.core.paths import canonical_game_dir, get_paths
 from reshade_shader_manager.core.recent_games import list_recent_games
 from reshade_shader_manager.core.git_sync import pull_existing_clones_for_catalog
 from reshade_shader_manager.core.pcgw import get_pcgw_repos
@@ -394,7 +394,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self._persist_target_metadata()
 
     def _apply_game_directory(self, path: Path) -> None:
-        self._game_dir = path.resolve()
+        self._game_dir = canonical_game_dir(path)
         self._game_label.set_text(str(self._game_dir))
         m = load_game_manifest(self._paths, self._game_dir)
         if m and m.game_exe:

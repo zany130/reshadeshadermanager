@@ -3,8 +3,14 @@
 import json
 from pathlib import Path
 
-from reshade_shader_manager.core.manifest import SCHEMA_VERSION, GameManifest, load_game_manifest, save_game_manifest
-from reshade_shader_manager.core.paths import RsmPaths, game_id_from_game_dir, new_manifest_path_for_game
+from reshade_shader_manager.core.manifest import (
+    SCHEMA_VERSION,
+    GameManifest,
+    load_game_manifest,
+    new_game_manifest,
+    save_game_manifest,
+)
+from reshade_shader_manager.core.paths import RsmPaths, canonical_game_dir_str, game_id_from_game_dir, new_manifest_path_for_game
 
 
 def test_manifest_roundtrip(tmp_path: Path, monkeypatch) -> None:
@@ -41,6 +47,23 @@ def test_manifest_roundtrip(tmp_path: Path, monkeypatch) -> None:
     assert m2.plugin_addon_companion_symlinks["swapchain-override"] == [
         "/game/reshade-shaders/Shaders/a.fx"
     ]
+
+
+def test_load_game_manifest_accepts_symlink_alias_path(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    paths = RsmPaths.from_env()
+    paths.ensure_layout()
+    real = (tmp_path / "realgame").resolve()
+    real.mkdir()
+    alias = tmp_path / "aliasgame"
+    alias.symlink_to(real, target_is_directory=True)
+    save_game_manifest(paths, new_game_manifest(real))
+    via_alias = load_game_manifest(paths, alias)
+    assert via_alias is not None
+    assert via_alias.game_dir == canonical_game_dir_str(real)
+    via_real = load_game_manifest(paths, real)
+    assert via_real is not None
+    assert via_real.game_dir == via_alias.game_dir
 
 
 def test_manifest_load_schema_v1_migrates_to_v2(tmp_path: Path, monkeypatch) -> None:

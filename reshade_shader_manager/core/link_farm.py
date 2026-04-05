@@ -21,7 +21,7 @@ from pathlib import Path
 
 from reshade_shader_manager.core.git_sync import clone_or_pull
 from reshade_shader_manager.core.manifest import GameManifest, load_game_manifest, new_game_manifest, save_game_manifest
-from reshade_shader_manager.core.paths import RsmPaths
+from reshade_shader_manager.core.paths import RsmPaths, canonical_game_dir
 
 log = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ def _is_under_managed_reshade_shaders(game_dir: Path, path: Path) -> bool:
     so symlink *locations* in the game tree are not followed into global clone targets.
     """
     try:
-        game_abs = game_dir.resolve()
+        game_abs = canonical_game_dir(game_dir)
     except OSError:
         return False
     base = (game_abs / "reshade-shaders").absolute()
@@ -341,7 +341,7 @@ def _recorded_path_to_dest_key(game_dir: Path, link_path_str: str) -> str | None
     except OSError:
         return None
     try:
-        gd = Path(game_dir).resolve()
+        gd = canonical_game_dir(game_dir)
     except OSError:
         gd = Path(game_dir)
     rs = gd / "reshade-shaders"
@@ -409,7 +409,7 @@ def _install_merged_entries(
     repo_id: str,
 ) -> list[str]:
     """Create per-file symlinks for merged projection; all-or-nothing for this repo."""
-    gd = game_dir.resolve()
+    gd = canonical_game_dir(game_dir)
     rs_base = gd / "reshade-shaders"
     (rs_base / "Shaders").mkdir(parents=True, exist_ok=True)
     (rs_base / "Textures").mkdir(parents=True, exist_ok=True)
@@ -432,7 +432,7 @@ def _install_merged_entries(
 def disable_shader_repo(*, paths: RsmPaths, manifest: GameManifest, repo_id: str) -> None:
     """Remove symlinks recorded for ``repo_id`` and drop it from ``enabled_repo_ids``."""
     rid = repo_id.strip().lower()
-    game_dir = Path(manifest.game_dir).resolve()
+    game_dir = canonical_game_dir(manifest.game_dir)
     links = list(manifest.symlinks_by_repo_id.pop(rid, []))
     for s in links:
         unlink_recorded_projection_path(game_dir, Path(s))
@@ -464,7 +464,7 @@ def apply_shader_projection(
     reused; missing clones are still cloned).
     """
     m = load_game_manifest(paths, game_dir) or new_game_manifest(game_dir)
-    gd = Path(m.game_dir).resolve()
+    gd = canonical_game_dir(m.game_dir)
 
     recorded: list[str] = []
     for plist in m.symlinks_by_repo_id.values():
@@ -538,8 +538,7 @@ def enable_shader_repo(
     clone_dir = paths.repo_clone_dir(rid)
     clone_or_pull(clone_dir, git_url, pull=git_pull)
 
-    game_dir = Path(manifest.game_dir)
-    gd = game_dir.resolve()
+    gd = canonical_game_dir(manifest.game_dir)
 
     entries, used_fallback = _enumerate_merged_projection_entries(clone_dir)
     if not entries:

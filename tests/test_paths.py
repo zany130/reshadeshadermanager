@@ -2,14 +2,41 @@
 
 from pathlib import Path
 
+import pytest
+
 from reshade_shader_manager.core.paths import (
     RsmPaths,
     candidate_game_manifest_paths,
+    canonical_game_dir,
     game_dir_fingerprint8,
     game_id_from_game_dir,
     manifest_slug_candidates,
     new_manifest_path_for_game,
 )
+
+
+def test_game_id_unifies_symlinked_directory(tmp_path: Path) -> None:
+    real = (tmp_path / "realgame").resolve()
+    real.mkdir()
+    alias = tmp_path / "aliasgame"
+    alias.symlink_to(real, target_is_directory=True)
+    assert game_id_from_game_dir(real) == game_id_from_game_dir(alias)
+    assert game_id_from_game_dir(str(real)) == game_id_from_game_dir(str(alias))
+    rp = RsmPaths(config_dir=tmp_path / "cfg", data_dir=tmp_path / "data", cache_dir=tmp_path / "cache")
+    assert new_manifest_path_for_game(rp, real, None) == new_manifest_path_for_game(rp, alias, None)
+
+
+def test_game_id_matches_home_and_var_home_when_linked() -> None:
+    """Fedora atomic / Bazzite: ``/home`` often symlinks to ``/var/home``."""
+    resolved_home = Path.home().resolve()
+    parts = resolved_home.parts
+    if len(parts) < 4 or parts[1:3] != ("var", "home"):
+        pytest.skip("home directory is not under /var/home")
+    alt = Path("/home") / Path(*parts[3:])
+    if not alt.is_dir() or alt.resolve() != resolved_home:
+        pytest.skip("/home/... does not alias the same directory as $HOME")
+    assert game_id_from_game_dir(resolved_home) == game_id_from_game_dir(alt)
+    assert canonical_game_dir(resolved_home) == canonical_game_dir(alt)
 
 
 def test_game_id_stable(tmp_path: Path) -> None:

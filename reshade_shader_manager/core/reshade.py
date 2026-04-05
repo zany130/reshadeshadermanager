@@ -14,7 +14,7 @@ from typing import Any
 
 from reshade_shader_manager.core.exceptions import RSMError, VersionResolutionError
 from reshade_shader_manager.core.manifest import GameManifest, save_game_manifest
-from reshade_shader_manager.core.paths import RsmPaths
+from reshade_shader_manager.core.paths import RsmPaths, canonical_game_dir
 from reshade_shader_manager.core.d3d8to9 import ensure_d3d8to9_dll
 from reshade_shader_manager.core.targets import DX8_WRAPPER_BASENAME, GraphicsAPI, proxy_dll_for_api
 
@@ -269,7 +269,7 @@ def install_reshade(
     """
     api = GraphicsAPI(graphics_api)
 
-    game_dir = Path(manifest.game_dir)
+    game_dir = canonical_game_dir(manifest.game_dir)
     if not game_dir.is_dir():
         raise RSMError(f"game_dir is not a directory: {game_dir}")
 
@@ -312,8 +312,8 @@ def remove_reshade_binaries(*, paths: RsmPaths, manifest: GameManifest) -> list[
     Remove only files listed in ``installed_reshade_files``; do not delete ``ReShade.ini``,
     shader symlinks, or ``enabled_repo_ids``. Returns warnings for missing files.
     """
-    game_dir = Path(manifest.game_dir)
     warnings: list[str] = []
+    game_dir = canonical_game_dir(manifest.game_dir)
     for name in list(manifest.installed_reshade_files):
         p = game_dir / name
         if p.is_file():
@@ -334,7 +334,7 @@ class ReShadeCheckResult:
 
 def check_reshade(manifest: GameManifest) -> ReShadeCheckResult:
     """Verify ``installed_reshade_files`` exist under ``game_dir``."""
-    game_dir = Path(manifest.game_dir)
+    game_dir = canonical_game_dir(manifest.game_dir)
     missing: list[str] = []
     for name in manifest.installed_reshade_files:
         p = game_dir / name

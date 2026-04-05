@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from reshade_shader_manager.core.paths import RsmPaths
+from reshade_shader_manager.core.paths import RsmPaths, canonical_game_dir, canonical_game_dir_str
 
 log = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ def _display_name_from_manifest(data: dict[str, Any]) -> str:
 
 def _canonical_game_dir_key(game_dir_str: str) -> str | None:
     try:
-        return str(Path(game_dir_str).expanduser().resolve())
+        return canonical_game_dir_str(game_dir_str)
     except OSError:
         return None
 
@@ -89,7 +89,10 @@ def list_recent_games(paths: RsmPaths, *, limit: int = RECENT_GAMES_LIMIT) -> li
             continue
         seen_keys.add(key)
 
-        game_dir = Path(str(gd_raw)).expanduser()
+        try:
+            game_dir = canonical_game_dir(str(gd_raw))
+        except OSError:
+            continue
         name = _display_name_from_manifest(data)
         path_short = _shorten_path_display(str(game_dir))
         out.append(RecentGameEntry(game_dir=game_dir, display_name=name, path_short=path_short))

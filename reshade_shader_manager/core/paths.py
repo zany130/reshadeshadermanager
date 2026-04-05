@@ -103,6 +103,21 @@ class RsmPaths:
         return self.data_dir / "d3d8to9" / f"d3d8-{safe}.dll"
 
 
+def canonical_game_dir(game_dir: str | Path) -> Path:
+    """
+    Stable absolute game root: expand ``~`` then resolve symlinks and ``..`` components.
+
+    Use for manifest identity, hashing, comparisons, and UI/CLI target selection so equivalent
+    paths (e.g. ``/home/...`` vs ``/var/home/...`` on Fedora atomic) map to one game.
+    """
+    return Path(game_dir).expanduser().resolve()
+
+
+def canonical_game_dir_str(game_dir: str | Path) -> str:
+    """String form of :func:`canonical_game_dir` (UTF-8 path text)."""
+    return str(canonical_game_dir(game_dir))
+
+
 def game_id_from_game_dir(game_dir: str | Path) -> str:
     """
     Stable opaque ID for a game install root.
@@ -110,8 +125,7 @@ def game_id_from_game_dir(game_dir: str | Path) -> str:
     Uses SHA-256 of the canonical absolute path (UTF-8) as hex, so the same
     directory always maps to the same manifest file.
     """
-    resolved = Path(game_dir).expanduser().resolve()
-    normalized = str(resolved).encode("utf-8")
+    normalized = canonical_game_dir_str(game_dir).encode("utf-8")
     return hashlib.sha256(normalized).hexdigest()
 
 
@@ -147,7 +161,7 @@ def manifest_slug_candidates(game_exe: str | None, game_dir: str | Path) -> list
         seg = _slugify_manifest_segment(stem)
         if seg:
             out.append(seg)
-    base = Path(game_dir).resolve().name
+    base = canonical_game_dir(game_dir).name
     seg2 = _slugify_manifest_segment(base)
     if seg2 and seg2 not in out:
         out.append(seg2)
@@ -162,7 +176,7 @@ def new_manifest_path_for_game(
     game_exe: str | None,
 ) -> Path:
     """Preferred human-readable manifest path: ``games/{slug}-{fp8}.json``."""
-    resolved = Path(game_dir).expanduser().resolve()
+    resolved = canonical_game_dir(game_dir)
     fp8 = game_dir_fingerprint8(resolved)
     slug = manifest_slug_candidates(game_exe, resolved)[0]
     return paths.games_dir() / f"{slug}-{fp8}.json"
@@ -182,7 +196,7 @@ def candidate_game_manifest_paths(
     Paths to try when loading, in order: explicit ``{slug}-{fp8}.json`` candidates, any other
     ``*-{fp8}.json`` in ``games/`` (not a full-catalog scan), then legacy hash name.
     """
-    resolved = Path(game_dir).expanduser().resolve()
+    resolved = canonical_game_dir(game_dir)
     fp8 = game_dir_fingerprint8(resolved)
     seen: set[str] = set()
     out: list[Path] = []

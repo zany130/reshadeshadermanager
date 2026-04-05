@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from reshade_shader_manager.core.paths import RsmPaths
+from reshade_shader_manager.core.paths import RsmPaths, canonical_game_dir
 from reshade_shader_manager.core.recent_games import RECENT_GAMES_LIMIT, list_recent_games
 
 
@@ -91,6 +91,24 @@ def test_list_recent_skips_invalid_json_continues(paths: RsmPaths, tmp_path: Pat
     entries = list_recent_games(paths, limit=5)
     assert len(entries) == 1
     assert entries[0].game_dir.resolve() == g
+
+
+def test_list_recent_dedupes_symlink_equivalent_game_dir_strings(paths: RsmPaths, tmp_path: Path) -> None:
+    real = (tmp_path / "realgame").resolve()
+    real.mkdir()
+    alias = tmp_path / "aliasgame"
+    alias.symlink_to(real, target_is_directory=True)
+    games = paths.games_dir()
+    f1 = games / "one-11111111.json"
+    f2 = games / "two-22222222.json"
+    _write_manifest(f1, str(real))
+    _write_manifest(f2, str(alias))
+    _touch(f2, time.time())
+    _touch(f1, time.time() - 10)
+
+    entries = list_recent_games(paths, limit=5)
+    assert len(entries) == 1
+    assert entries[0].game_dir == canonical_game_dir(real)
 
 
 def test_list_recent_dedupes_canonical_game_dir(paths: RsmPaths, tmp_path: Path) -> None:
