@@ -1,38 +1,35 @@
 #!/usr/bin/env python3
-"""Write a simple 128x128 PNG icon (stdlib only)."""
+"""Validate pre-rendered hicolor icons (no ImageMagick required at build time).
+
+See packaging/README.md for how to regenerate icons when the source logo changes.
+"""
 from __future__ import annotations
 
-import struct
-import zlib
+import sys
 from pathlib import Path
 
-
-def _png_chunk(chunk_type: bytes, data: bytes) -> bytes:
-    return (
-        struct.pack(">I", len(data))
-        + chunk_type
-        + data
-        + struct.pack(">I", zlib.crc32(chunk_type + data) & 0xFFFFFFFF)
-    )
+_ICON_NAME = "reshade-shader-manager.png"
+_SIZES = (64, 128, 256, 512)
 
 
-def write_simple_png(path: Path, size: int = 128, rgb: tuple[int, int, int] = (46, 125, 50)) -> None:
-    """Solid-color RGB PNG (green-ish, ReShade-adjacent)."""
-    r, g, b = rgb
-    row = bytes([0, r, g, b]) * size
-    raw = b"".join(row for _ in range(size))
-    compressed = zlib.compress(raw, level=9)
+def validate_icons() -> None:
+    root = Path(__file__).resolve().parent
+    for size in _SIZES:
+        p = root / "icons" / "hicolor" / f"{size}x{size}" / "apps" / _ICON_NAME
+        if not p.is_file():
+            raise FileNotFoundError(f"missing pre-rendered icon: {p}")
+    top = root / _ICON_NAME
+    if not top.is_file():
+        raise FileNotFoundError(f"missing AppImage root icon copy: {top}")
 
-    ihdr = struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)
-    png = b"\x89PNG\r\n\x1a\n"
-    png += _png_chunk(b"IHDR", ihdr)
-    png += _png_chunk(b"IDAT", compressed)
-    png += _png_chunk(b"IEND", b"")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(png)
+
+def main() -> None:
+    try:
+        validate_icons()
+    except FileNotFoundError as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    out = Path(__file__).resolve().parent / "reshade-shader-manager.png"
-    write_simple_png(out)
-    print(out)
+    main()

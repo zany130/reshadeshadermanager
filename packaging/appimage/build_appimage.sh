@@ -24,7 +24,7 @@ echo "==> Version:   ${VERSION}"
 
 command -v python3 >/dev/null || { echo "python3 required"; exit 1; }
 
-echo "==> Generating icon"
+echo "==> Validating pre-rendered icons"
 python3 "${SCRIPT_DIR}/make_icon.py"
 
 echo "==> Installing PyInstaller (user/site)"
@@ -51,9 +51,12 @@ mkdir -p "${APPDIR}/usr/share/applications"
 cp "${SCRIPT_DIR}/reshade-shader-manager.desktop" "${APPDIR}/reshade-shader-manager.desktop"
 cp "${SCRIPT_DIR}/reshade-shader-manager.desktop" "${APPDIR}/usr/share/applications/reshade-shader-manager.desktop"
 
-mkdir -p "${APPDIR}/usr/share/icons/hicolor/128x128/apps"
+for _size in 64 128 256 512; do
+  mkdir -p "${APPDIR}/usr/share/icons/hicolor/${_size}x${_size}/apps"
+  cp "${SCRIPT_DIR}/icons/hicolor/${_size}x${_size}/apps/reshade-shader-manager.png" \
+    "${APPDIR}/usr/share/icons/hicolor/${_size}x${_size}/apps/reshade-shader-manager.png"
+done
 cp "${SCRIPT_DIR}/reshade-shader-manager.png" "${APPDIR}/reshade-shader-manager.png"
-cp "${SCRIPT_DIR}/reshade-shader-manager.png" "${APPDIR}/usr/share/icons/hicolor/128x128/apps/reshade-shader-manager.png"
 
 echo "==> Fetch appimagetool if needed"
 mkdir -p "${SCRIPT_DIR}/tools"

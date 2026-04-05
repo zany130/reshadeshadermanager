@@ -52,8 +52,12 @@ From the repository root on a **Fedora-like** build machine with `gtk4`, `python
 ./packaging/appimage/build_appimage.sh
 ```
 
-This runs PyInstaller (onedir) and produces `packaging/appimage/reshade-shader-manager-0.6.0-x86_64.AppImage` by default (override with `RSM_APPIMAGE_VERSION`). The bundle is compressed to roughly tens of megabytes; the unpacked tree is much larger because PyInstaller’s GObject/GTK hooks collect typelibs and related data. **GTK 4 is still expected on the host** at runtime.
+This runs PyInstaller (onedir) and produces `packaging/appimage/reshade-shader-manager-<version>-x86_64.AppImage` by default (override with `RSM_APPIMAGE_VERSION`). The bundle is compressed to roughly tens of megabytes; the unpacked tree is much larger because PyInstaller’s GObject/GTK hooks collect typelibs and related data. **GTK 4 is still expected on the host** at runtime.
 
-`packaging/appimage/AppDir/`, `packaging/appimage/tools/`, and `*.AppImage` outputs are gitignored; only the scripts, spec, desktop entry, and icon in `packaging/appimage/` are source-controlled.
+### AppImage icons
+
+Pre-rendered PNGs live under [`packaging/appimage/icons/hicolor/`](appimage/icons/hicolor/) (64–512 px) plus [`packaging/appimage/reshade-shader-manager.png`](appimage/reshade-shader-manager.png) (128×128 copy for the AppDir root). [`make_icon.py`](appimage/make_icon.py) **validates** these files at build time; **ImageMagick is not required** to run `./build_appimage.sh`. The canonical raster source used to produce those sizes is [`packaging/appimage/branding/rsm-logo-source.png`](appimage/branding/rsm-logo-source.png). To regenerate icons after changing the artwork, resize/crop to square offline (e.g. ImageMagick once on a maintainer machine), replace the committed PNGs, then run `python3 packaging/appimage/make_icon.py` to verify.
+
+`packaging/appimage/AppDir/`, `packaging/appimage/tools/`, and `*.AppImage` outputs are gitignored; scripts, spec, desktop entry, and icon assets under `packaging/appimage/` are source-controlled.
 
 To run the artifact: `chmod +x …AppImage && ./…AppImage`. On some systems you may need FUSE or `--appimage-extract-and-run` (see [AppImage docs](https://docs.appimage.org/user-guide/run-appimages.html)).
