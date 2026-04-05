@@ -40,7 +40,7 @@ class ShaderRepoWindow(Gtk.Window):
         super().__init__(
             transient_for=parent,
             modal=True,
-            title="Shader repositories",
+            title="Manage shaders",
             default_width=800,
             default_height=420,
         )
@@ -66,7 +66,7 @@ class ShaderRepoWindow(Gtk.Window):
             self._enabled_by_id[rid] = rid in enabled
 
         search = Gtk.SearchEntry()
-        search.set_placeholder_text("Search…")
+        search.set_placeholder_text("Search by name, author, description, source…")
         search.set_hexpand(True)
 
         store = Gio.ListStore(item_type=CatalogRow)

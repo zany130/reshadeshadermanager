@@ -155,7 +155,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self._recent_listbox.connect("row-activated", self._on_recent_row_activated)
         outer.append(self._recent_listbox)
 
-        self._recent_empty = Gtk.Label(label="No saved games yet.", xalign=0.0)
+        self._recent_empty = Gtk.Label(label="No recent games yet.", xalign=0.0)
         self._recent_empty.set_opacity(0.65)
         self._recent_listbox.set_visible(False)
         self._recent_empty.set_visible(True)
