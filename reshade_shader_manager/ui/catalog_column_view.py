@@ -1,4 +1,4 @@
-"""Gtk.ColumnView + FilterListModel helpers for catalog dialogs (GTK 4)."""
+"""Gtk.ColumnView + SortListModel + FilterListModel helpers for catalog dialogs (GTK 4)."""
 
 from __future__ import annotations
 
@@ -22,20 +22,17 @@ class CatalogRow(GObject.Object):
     source = GObject.Property(type=str, default="")
 
 
-def sort_catalog_by_name(catalog: list[dict[str, str]]) -> list[dict[str, str]]:
-    """Stable sort by display name (case-insensitive), then id."""
-
-    def key(d: dict[str, str]) -> tuple[str, str]:
-        name = (d.get("name") or d.get("id") or "").casefold()
-        rid = (d.get("id") or "").casefold()
-        return (name, rid)
-
-    return sorted(catalog, key=key)
+def _string_sorter_for_property(prop: str) -> Gtk.StringSorter:
+    """Case-insensitive string sort on a ``CatalogRow`` property."""
+    expr = Gtk.PropertyExpression.new(CatalogRow.__gtype__, None, prop)
+    sorter = Gtk.StringSorter.new(expr)
+    sorter.set_ignore_case(True)
+    return sorter
 
 
 def populate_catalog_store(store: Gio.ListStore, catalog: list[dict[str, str]]) -> None:
-    """Append ``CatalogRow`` items for each catalog entry (sorted by name)."""
-    for d in sort_catalog_by_name(catalog):
+    """Append ``CatalogRow`` items in stable ``id`` order (``Gtk.SortListModel`` owns display order)."""
+    for d in sorted(catalog, key=lambda x: x["id"].casefold()):
         rid = d["id"]
         store.append(
             CatalogRow(
@@ -67,9 +64,15 @@ def build_catalog_column_view(
     get_query: Callable[[], str],
 ) -> tuple[Gtk.ScrolledWindow, Gtk.CustomFilter]:
     """
-    Build a scrolled ``Gtk.ColumnView`` over ``store`` with a search filter.
+    Build a scrolled ``Gtk.ColumnView`` over ``store`` with sort + search filter.
 
+    Sorting uses ``Gtk.SortListModel`` driven by ``Gtk.ColumnView.get_sorter()`` so
+    header clicks update order; filtering uses ``Gtk.FilterListModel`` on top of that.
     Enable/disable state is read and written via ``enabled_by_id`` (stable ids).
+
+    **Enabled column sort:** ascending puts **unchecked** rows first; descending
+    puts **checked** rows first.
+
     Connect :func:`connect_search_invalidate` to the search entry so typing
     updates the filter.
     """
@@ -81,13 +84,25 @@ def build_catalog_column_view(
         return catalog_entry_matches(get_query(), _row_match_dict(row))
 
     custom_filter = Gtk.CustomFilter.new(match_func, None)
-    filter_model = Gtk.FilterListModel.new(store, custom_filter)
-    selection = Gtk.NoSelection.new(filter_model)
 
-    column_view = Gtk.ColumnView(model=selection)
+    # Ascending: disabled (False) before enabled (True); descending reverses.
+    def cmp_enabled(o1: GObject.Object, o2: GObject.Object, _ud: Any = None) -> Gtk.Ordering:
+        if not isinstance(o1, CatalogRow) or not isinstance(o2, CatalogRow):
+            return Gtk.Ordering.EQUAL
+        e1 = enabled_by_id.get(o1.props.repo_id, False)
+        e2 = enabled_by_id.get(o2.props.repo_id, False)
+        if e1 == e2:
+            return Gtk.Ordering.EQUAL
+        if not e1 and e2:
+            return Gtk.Ordering.SMALLER
+        return Gtk.Ordering.LARGER
+
+    enabled_sorter = Gtk.CustomSorter.new(cmp_enabled)
+
+    column_view = Gtk.ColumnView()
     column_view.set_vexpand(True)
 
-    # --- Enable column
+    # --- Enabled column
     cb_factory = Gtk.SignalListItemFactory()
 
     def cb_setup(_f: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
@@ -104,6 +119,7 @@ def build_catalog_column_view(
 
         def toggled(b: Gtk.CheckButton) -> None:
             enabled_by_id[rid] = b.get_active()
+            enabled_sorter.changed(Gtk.SorterChange.DIFFERENT)
 
         hid = cb.connect("toggled", toggled)
         setattr(list_item, "_rsm_toggle_hid", hid)
@@ -123,13 +139,14 @@ def build_catalog_column_view(
     cb_factory.connect("bind", cb_bind)
     cb_factory.connect("unbind", cb_unbind)
 
-    col_enable = Gtk.ColumnViewColumn(title="", factory=cb_factory)
-    col_enable.set_fixed_width(48)
-    col_enable.set_resizable(False)
+    col_enable = Gtk.ColumnViewColumn(title="Enabled", factory=cb_factory)
+    col_enable.set_sorter(enabled_sorter)
+    col_enable.set_fixed_width(88)
+    col_enable.set_resizable(True)
     column_view.append_column(col_enable)
 
-    # --- Text columns
-    def add_text_column(title: str, attr: str) -> None:
+    # --- Text columns (Name column reference needed for default sort)
+    def add_text_column(title: str, attr: str) -> Gtk.ColumnViewColumn:
         factory = Gtk.SignalListItemFactory()
 
         def setup(_f: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
@@ -162,13 +179,22 @@ def build_catalog_column_view(
         factory.connect("bind", bind)
         factory.connect("unbind", unbind)
         col = Gtk.ColumnViewColumn(title=title, factory=factory)
+        col.set_sorter(_string_sorter_for_property(attr))
         col.set_resizable(True)
         column_view.append_column(col)
+        return col
 
-    add_text_column("Name", "name")
+    col_name = add_text_column("Name", "name")
     add_text_column("Author", "author")
     add_text_column("Description", "description")
     add_text_column("Source", "source")
+
+    # SortListModel must use the view's sorter so header clicks affect row order (GTK docs).
+    sort_model = Gtk.SortListModel.new(store, column_view.get_sorter())
+    filter_model = Gtk.FilterListModel.new(sort_model, custom_filter)
+    selection = Gtk.NoSelection.new(filter_model)
+    column_view.set_model(selection)
+    column_view.sort_by_column(col_name, Gtk.SortType.ASCENDING)
 
     scroll = Gtk.ScrolledWindow()
     scroll.set_vexpand(True)
