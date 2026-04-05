@@ -117,7 +117,7 @@ def test_install_remove_reshade_flow(
     )
     m2 = load_game_manifest(rsm_paths, game)
     assert m2 is not None
-    assert m2.installed_reshade_files == ["dxgi.dll"]
+    assert m2.installed_reshade_files == ["dxgi.dll", "d3dcompiler_47.dll"]
     assert (game / "dxgi.dll").is_file()
     assert (game / "d3dcompiler_47.dll").is_file()
 
@@ -127,7 +127,7 @@ def test_install_remove_reshade_flow(
     assert m3 is not None
     assert m3.installed_reshade_files == []
     assert not (game / "dxgi.dll").exists()
-    assert (game / "d3dcompiler_47.dll").is_file()
+    assert not (game / "d3dcompiler_47.dll").exists()
 
 
 def test_d3dcompiler_uses_cache_when_absent_from_extract(
@@ -159,6 +159,9 @@ def test_d3dcompiler_uses_cache_when_absent_from_extract(
     p = game / "d3dcompiler_47.dll"
     assert p.is_file()
     assert p.read_bytes() == b"cached-copy"
+    m2 = load_game_manifest(rsm_paths, game)
+    assert m2 is not None
+    assert m2.installed_reshade_files == ["dxgi.dll", "d3dcompiler_47.dll"]
 
 
 def test_d3dcompiler_downloads_via_helper_when_cache_empty(
@@ -196,6 +199,9 @@ def test_d3dcompiler_downloads_via_helper_when_cache_empty(
     p = game / "d3dcompiler_47.dll"
     assert p.is_file()
     assert p.read_bytes() == b"from-helper"
+    m2 = load_game_manifest(rsm_paths, game)
+    assert m2 is not None
+    assert m2.installed_reshade_files == ["dxgi.dll", "d3dcompiler_47.dll"]
 
 
 def test_d3dcompiler_not_overwritten_if_already_present(
@@ -215,6 +221,9 @@ def test_d3dcompiler_not_overwritten_if_already_present(
         variant="standard",
     )
     assert existing.read_bytes() == b"user-provided"
+    m2 = load_game_manifest(rsm_paths, game)
+    assert m2 is not None
+    assert m2.installed_reshade_files == ["dxgi.dll"]
 
 
 def test_reinstall_replaces_proxy_and_manifest_list(
@@ -246,7 +255,7 @@ def test_reinstall_replaces_proxy_and_manifest_list(
     assert (game / "opengl32.dll").is_file()
     m2 = load_game_manifest(rsm_paths, game)
     assert m2 is not None
-    assert m2.installed_reshade_files == ["opengl32.dll"]
+    assert m2.installed_reshade_files == ["opengl32.dll", "d3dcompiler_47.dll"]
     assert (game / "d3dcompiler_47.dll").is_file()
 
 

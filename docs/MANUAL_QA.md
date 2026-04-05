@@ -28,7 +28,7 @@ Record failures in the issue tracker or release notes.
 | Verify |
 |--------|
 | **Install** / **Check** / **Remove** (GUI or `rsm reshade …`). |
-| **`d3dcompiler_47.dll`:** After install, present if it was missing (downloaded from Lutris mirror into XDG cache, then copied); never overwritten. Stays on disk after **Remove** (not a managed uninstall target). |
+| **`d3dcompiler_47.dll`:** After install, present if it was missing (Lutris mirror → XDG cache → game); never overwritten. Listed in the manifest when RSM installed it; **Remove** deletes it with other ReShade binaries. |
 | After **Remove**, message indicates binaries removed and **existing `ReShade.ini` left in place** (shader/add-on state unchanged unless you changed it). |
 
 ## Plugin add-ons

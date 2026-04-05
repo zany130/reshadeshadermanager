@@ -214,20 +214,21 @@ def _download_d3dcompiler_47_to_cache(paths: RsmPaths) -> Path:
     return dest
 
 
-def _ensure_d3dcompiler_47(game_dir: Path, paths: RsmPaths) -> None:
+def _ensure_d3dcompiler_47(game_dir: Path, paths: RsmPaths) -> bool:
     """
     If ``<game_dir>/d3dcompiler_47.dll`` is missing, copy from XDG cache (downloading first if needed).
 
-    Does not overwrite an existing file. Does not add the DLL to ``installed_reshade_files`` so
-    uninstall does not remove it (one-way ensure for Proton/Wine compatibility).
+    Does not overwrite an existing file. Returns True if this call installed the DLL (list it in
+    ``installed_reshade_files``); False if the file was already present (e.g. user-supplied).
     """
     dest = game_dir / _D3D_COMPILER_BASENAME
     if dest.exists():
-        return
+        return False
 
     cache = _download_d3dcompiler_47_to_cache(paths)
     shutil.copy2(cache, dest)
     log.info("Installed d3dcompiler_47.dll for ReShade compatibility")
+    return True
 
 
 def find_payload_dlls(extract_root: Path, arch: str) -> Path:
@@ -251,16 +252,17 @@ def install_reshade(
     Install ReShade proxy + ensure ``d3dcompiler_47.dll`` is present (Wine/Proton compatibility).
 
     Only one active ReShade runtime per game directory. Before copying new DLLs, any files still
-    listed in ``installed_reshade_files`` are removed from disk (except ``d3dcompiler_47.dll``,
-    which is never deleted here) so switching API does not leave orphan proxies. The manifest
-    list is then **replaced** with the new install set (no merge across runs).
+    listed in ``installed_reshade_files`` are removed from disk so switching API does not leave
+    orphan proxies. The manifest list is then **replaced** with the new install set (no merge across runs).
 
     **DX8:** installs crosire ``d3d8to9`` as ``d3d8.dll`` and ReShade as ``d3d9.dll`` (32-bit games only
     with current upstream release).
 
     ``d3dcompiler_47.dll`` is not part of the ReShade installer; it is downloaded when missing
-    (Lutris mirror), cached under XDG data, and copied next to the proxy. It is **not** listed in
-    ``installed_reshade_files`` and is **not** removed by :func:`remove_reshade_binaries`.
+    (Lutris mirror), cached under XDG data, and copied next to the proxy. When RSM installs it,
+    the basename is appended to ``installed_reshade_files`` (Linux/Wine layout) and removed with
+    other ReShade binaries by :func:`remove_reshade_binaries`. If the file already exists in the
+    game directory, it is left unchanged and not tracked.
 
     Does not create or edit ``ReShade.ini`` (ReShade manages that at runtime). Does not clear
     shader symlinks or ``enabled_repo_ids``.
@@ -272,10 +274,7 @@ def install_reshade(
         raise RSMError(f"game_dir is not a directory: {game_dir}")
 
     # Single-runtime reinstall: remove prior tracked binaries only (not INI / symlinks).
-    # Never remove d3dcompiler_47.dll here — it may be user-managed or from a prior ensure.
     for name in list(manifest.installed_reshade_files):
-        if name == _D3D_COMPILER_BASENAME:
-            continue
         prev = game_dir / name
         if prev.is_file():
             prev.unlink()
@@ -296,7 +295,8 @@ def install_reshade(
         installed.append(DX8_WRAPPER_BASENAME)
     shutil.copy2(reshade_src, game_dir / dest_name)
     installed.append(dest_name)
-    _ensure_d3dcompiler_47(game_dir, paths)
+    if _ensure_d3dcompiler_47(game_dir, paths):
+        installed.append(_D3D_COMPILER_BASENAME)
 
     manifest.reshade_version = resolved
     manifest.reshade_variant = "addon" if addon else "standard"
@@ -310,13 +310,11 @@ def install_reshade(
 def remove_reshade_binaries(*, paths: RsmPaths, manifest: GameManifest) -> list[str]:
     """
     Remove only files listed in ``installed_reshade_files``; do not delete ``ReShade.ini``,
-    ``d3dcompiler_47.dll``, shader symlinks, or ``enabled_repo_ids``. Returns warnings for missing files.
+    shader symlinks, or ``enabled_repo_ids``. Returns warnings for missing files.
     """
     game_dir = Path(manifest.game_dir)
     warnings: list[str] = []
     for name in list(manifest.installed_reshade_files):
-        if name == _D3D_COMPILER_BASENAME:
-            continue
         p = game_dir / name
         if p.is_file():
             p.unlink()

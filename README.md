@@ -99,13 +99,13 @@ Backend uses these defaults:
 
 Per-game projection happens under:
 
-- `<game>/<ReShade proxy dll>.dll` + optional `d3dcompiler_47.dll`
+- `<game>/<ReShade proxy dll>.dll` + `d3dcompiler_47.dll` when RSM ensured it (tracked in the manifest when RSM placed the file)
 - `<game>/reshade-shaders/Shaders/` and `.../Textures/` — merged tree of per-file symlinks (see link farm); RSM does not create or edit `ReShade.ini`
 
 ## Notes / limitations
 
 - RSM supports **one active ReShade install state per game directory** (reinstall replaces the tracked proxy binaries list; no multi-runtime merging).
-- **`d3dcompiler_47.dll`:** RSM **ensures** one is present next to the ReShade proxy when missing by downloading from the **Lutris** tools mirror (cached under XDG data) for Wine/Proton compatibility—ReShade does not include this DLL. RSM **does not** overwrite an existing file and **does not** remove it when you **Remove ReShade** binaries.
+- **`d3dcompiler_47.dll`:** RSM **ensures** one is present next to the ReShade proxy when missing by downloading from the **Lutris** tools mirror (cached under XDG data) for Wine/Proton compatibility—ReShade does not include this DLL. RSM **does not** overwrite an existing file. When RSM installs the DLL, it is tracked in `installed_reshade_files` and **is** removed with other ReShade binaries on **Remove ReShade**; a pre-existing file is left untracked.
 - **DirectX 8** uses **d3d8to9** (`d3d8.dll`) plus ReShade as **`d3d9.dll`**. The pinned crosire release currently ships a **32-bit** `d3d8.dll` only; **64-bit games** get a clear error at install time.
 - “Remove ReShade” is binary-only: it deletes files tracked in `installed_reshade_files` and does **not** remove shader symlinks, enabled repo state, or `ReShade.ini` (existing `ReShade.ini` is left in place).
 
