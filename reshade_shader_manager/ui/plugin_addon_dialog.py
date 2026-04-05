@@ -9,6 +9,7 @@ from typing import Callable
 
 from gi.repository import Gio, GLib, Gtk
 
+from reshade_shader_manager.core.exceptions import RSMError
 from reshade_shader_manager.core.manifest import GameManifest
 from reshade_shader_manager.core.plugin_addons_install import (
     apply_plugin_addon_installation,
@@ -172,6 +173,14 @@ class PluginAddonWindow(Gtk.Window):
                     return False
 
                 GLib.idle_add(dispatch_ok)
+            except RSMError as e:
+                log.warning("Plugin add-on apply failed: %s", e)
+
+                def dispatch_err() -> bool:
+                    err(e)
+                    return False
+
+                GLib.idle_add(dispatch_err)
             except Exception as e:  # noqa: BLE001
                 log.exception("Plugin add-on apply failed")
 

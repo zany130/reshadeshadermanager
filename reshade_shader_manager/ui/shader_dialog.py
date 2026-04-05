@@ -10,6 +10,7 @@ from typing import Callable
 from gi.repository import Gio, GLib, Gtk
 
 from reshade_shader_manager.core.config import AppConfig
+from reshade_shader_manager.core.exceptions import RSMError
 from reshade_shader_manager.core.link_farm import apply_shader_projection
 from reshade_shader_manager.core.manifest import load_game_manifest, new_game_manifest
 from reshade_shader_manager.core.paths import RsmPaths
@@ -146,6 +147,14 @@ class ShaderRepoWindow(Gtk.Window):
                     return False
 
                 GLib.idle_add(dispatch_ok)
+            except RSMError as e:
+                log.warning("Shader apply failed: %s", e)
+
+                def dispatch_err() -> bool:
+                    err(e)
+                    return False
+
+                GLib.idle_add(dispatch_err)
             except Exception as e:  # noqa: BLE001
                 log.exception("Shader apply failed")
 
