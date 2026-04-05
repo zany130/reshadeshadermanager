@@ -316,6 +316,12 @@ def test_pcgw_parse_fixture() -> None:
     assert quint["source"] == "pcgw"
     assert quint["git_url"] == "https://github.com/martymcmodding/qUINT.git"
     assert quint["name"] == "qUINT"
+    # Header row uses placeholder Author/Desc cells; owner comes from URL.
+    assert quint["author"] == "martymcmodding"
+    assert quint["description"] == ""
+    reshade = next(r for r in repos if r["id"] == "reshade-shaders")
+    assert reshade["author"] == "crosire"
+    assert reshade["description"] == "Default"
 
 
 @pytest.mark.integration

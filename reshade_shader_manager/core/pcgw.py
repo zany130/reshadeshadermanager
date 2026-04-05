@@ -63,18 +63,58 @@ def _slug_repo_id_from_url(git_url: str) -> str:
     return base
 
 
+def _github_owner_from_git_url(git_url: str) -> str:
+    """Return the GitHub user/org segment from a repo URL, or ``\"\"``."""
+    u = git_url.rstrip("/").removesuffix(".git")
+    m = re.match(r"https?://github\.com/([^/]+)/", u)
+    return m.group(1) if m else ""
+
+
+# Table rows may include <td>author</td><td>description</td> after the link cell.
+_PCGW_ROW_EXTRA_CELLS = re.compile(
+    r"</a>\s*</td>\s*<td[^>]*>([^<]*)</td>\s*<td[^>]*>([^<]*)</td>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _author_description_from_row(row: str, *, owner: str) -> tuple[str, str]:
+    """
+    Use wiki table cells when present; otherwise author falls back to ``owner``.
+
+    Skips common wiki header placeholders (\"Author\" / \"Desc\").
+    """
+    m = _PCGW_ROW_EXTRA_CELLS.search(row)
+    if not m:
+        return owner, ""
+    au = m.group(1).strip()
+    desc = m.group(2).strip()
+    if au.lower() in ("author",):
+        au = ""
+    if desc.lower() in ("desc", "description"):
+        desc = ""
+    author_out = au if au else owner
+    return author_out, desc
+
+
 def parse_pcgw_repos_from_html(html: str) -> list[dict[str, str]]:
     """
-    Best-effort: find GitHub git URLs and synthesize ids.
+    Best-effort: find GitHub git URLs (per table row when possible) and synthesize ids.
+
+    Author/description: taken from adjacent wiki ``<td>`` cells when the table has
+    them; otherwise author defaults to the GitHub URL owner segment. The live PCGW
+    page shape varies; missing cells are not an error.
 
     May return duplicates filtered by id later.
     """
     repos: list[dict[str, str]] = []
     seen: set[str] = set()
-    for m in re.finditer(
-        r'href="(https://github\.com/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)(?:\.git)?"',
-        html,
-    ):
+    for row in re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.IGNORECASE | re.DOTALL):
+        m = re.search(
+            r'href="(https://github\.com/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)(?:\.git)?"',
+            row,
+        )
+        if not m:
+            continue
         url = m.group(1)
         if "/releases" in url or "/issues" in url:
             continue
@@ -89,13 +129,15 @@ def parse_pcgw_repos_from_html(html: str) -> list[dict[str, str]]:
             continue
         seen.add(rid)
         name = url.rstrip("/").split("/")[-1]
+        owner = _github_owner_from_git_url(git_url)
+        author, description = _author_description_from_row(row, owner=owner)
         repos.append(
             {
                 "id": rid,
                 "name": name,
                 "git_url": git_url,
-                "author": "",
-                "description": "",
+                "author": author,
+                "description": description,
                 "source": "pcgw",
             }
         )
