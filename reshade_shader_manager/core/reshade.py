@@ -29,6 +29,7 @@ USER_AGENT = "reshade-shader-manager/0.1"
 # HLSL / D3D compile support for ReShade under Wine/Proton; never tracked in manifest (see install/remove).
 _D3D_COMPILER_BASENAME = "d3dcompiler_47.dll"
 _MINIMAL_RESHADE_INI_GTK = (
+    "[GENERAL]\n"
     "EffectSearchPaths=.\\reshade-shaders\\Shaders\\\n"
     "TextureSearchPaths=.\\reshade-shaders\\Textures\\\n"
 )
