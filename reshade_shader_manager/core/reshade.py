@@ -28,6 +28,10 @@ USER_AGENT = "reshade-shader-manager/0.1"
 
 # HLSL / D3D compile support for ReShade under Wine/Proton; never tracked in manifest (see install/remove).
 _D3D_COMPILER_BASENAME = "d3dcompiler_47.dll"
+_MINIMAL_RESHADE_INI_GTK = (
+    "EffectSearchPaths=.\\reshade-shaders\\Shaders\\\n"
+    "TextureSearchPaths=.\\reshade-shaders\\Textures\\\n"
+)
 
 
 def _http_json_get(url: str, *, timeout: float = 30.0) -> Any:
@@ -231,6 +235,22 @@ def _ensure_d3dcompiler_47(game_dir: Path, paths: RsmPaths) -> bool:
     return True
 
 
+def _reshade_ini_path_for_manifest(manifest: GameManifest, game_dir: Path) -> Path:
+    if manifest.game_exe:
+        exe = Path(manifest.game_exe).expanduser()
+        return exe.parent / "ReShade.ini"
+    return game_dir / "ReShade.ini"
+
+
+def _ensure_minimal_reshade_ini_if_missing(manifest: GameManifest, game_dir: Path) -> None:
+    ini_path = _reshade_ini_path_for_manifest(manifest, game_dir)
+    if ini_path.exists():
+        return
+    ini_path.parent.mkdir(parents=True, exist_ok=True)
+    ini_path.write_text(_MINIMAL_RESHADE_INI_GTK, encoding="utf-8")
+    log.info("Created minimal ReShade.ini at %s", ini_path)
+
+
 def find_payload_dlls(extract_root: Path, arch: str) -> Path:
     """Return path to ``ReShade{32|64}.dll`` under the installer extract."""
     name = "ReShade64.dll" if arch == "64" else "ReShade32.dll"
@@ -264,8 +284,8 @@ def install_reshade(
     other ReShade binaries by :func:`remove_reshade_binaries`. If the file already exists in the
     game directory, it is left unchanged and not tracked.
 
-    Does not create or edit ``ReShade.ini`` (ReShade manages that at runtime). Does not clear
-    shader symlinks or ``enabled_repo_ids``.
+    Creates a minimal ``ReShade.ini`` only if missing, without modifying any existing file.
+    Does not clear shader symlinks or ``enabled_repo_ids``.
     """
     api = GraphicsAPI(graphics_api)
 
@@ -297,6 +317,7 @@ def install_reshade(
     installed.append(dest_name)
     if _ensure_d3dcompiler_47(game_dir, paths):
         installed.append(_D3D_COMPILER_BASENAME)
+    _ensure_minimal_reshade_ini_if_missing(manifest, game_dir)
 
     manifest.reshade_version = resolved
     manifest.reshade_variant = "addon" if addon else "standard"
