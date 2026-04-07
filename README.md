@@ -10,6 +10,10 @@ App icon assets: `packaging/appimage/icons/hicolor/` (source logo: `packaging/ap
 
 The **GTK 4** UI is a thin frontend over the same metadata-driven backend as the CLI.
 
+## Related Project
+
+- Steam Deck plugin frontend: [RSM-Decky](https://github.com/zany130/RSM-Decky)
+
 ## Features
 
 - Pick a game directory (+ optional `.exe` to detect 32/64-bit)
